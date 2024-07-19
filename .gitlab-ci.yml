@@ -1,0 +1,16 @@
+---
+
+image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
+
+stages:
+  - validate
+
+lint:
+  stage: validate
+  allow_failure: true
+  variables:
+    SHELLCHECK_OPTS: ""
+  script:
+    - shellcheck scripts/crawl_clusters.sh
+
+...
