@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Skript zum Sammeln von Daten aller "unserer" Cluster
+# Script to collect data from all "our" clusters
 
 UNSERE_CLUSTER="fttc ftctl"
 
@@ -108,6 +108,7 @@ if [ ! -s ${NAMEID_MAP} ]; then
     echo "debug: unsere cluster sind '${UNSERE_CLUSTER}'"
     for tnt in ${UNSERE_CLUSTER}; do
         echo "debug: tenant is ${tnt}"
+        # Check if clusters are listed for each tenant and append them to the map
         if ! cloudctl cluster list --tenant ${tnt} | grep -v "NAME" | awk '{ print $4";"$1 }' >> ${NAMEID_MAP}; then
             echo "error: failed to list clusters for tenant '${tnt}'"
             debug_crawler_error
@@ -115,6 +116,7 @@ if [ ! -s ${NAMEID_MAP} ]; then
         fi
     done
 
+    # Final check to ensure the name_id.map file is populated
     if [ ! -s ${NAMEID_MAP} ]; then
         echo "error: failed to create / fill '${NAMEID_MAP}'"
         debug_crawler_error
