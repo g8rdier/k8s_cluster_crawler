@@ -24,6 +24,28 @@ create_empty_directory() {
     return $?
 }
 
+# Function to set the Kubernetes context for a given cluster
+set_kube_context() {
+    local CLUSTER_NAME="$1"
+
+    # This assumes the context name follows a pattern like 'context-<cluster_name>'
+    local CONTEXT_NAME="context-${CLUSTER_NAME}"
+
+    # Switch to the appropriate context
+    if kubectl config use-context "${CONTEXT_NAME}"; then
+        echo "Successfully switched to context ${CONTEXT_NAME}"
+        return 0
+    else
+        echo "Failed to switch to context ${CONTEXT_NAME}"
+        return 1
+    fi
+}
+
+
+# ab hier beginnt main
+
+
+# Erstellung von Variablen DAYSTAMP, RESULTS_DIR und TMPS_DIR inkl. directories für results & tmps
 DAYSTAMP="$(date +"%Y%m%d")"
 
 RESULTS_DIR="results"
@@ -37,6 +59,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+
+# Erstellung 
 INFO_CACHE="info_cache_${DAYSTAMP}"
 
 if [ "${FORCE_REBUILD}" == "1" ]; then
@@ -64,13 +88,10 @@ debug_crawler_error() {
     ls -al ${INFO_CACHE}
 }
 
-#
-# alle IPs aller cluster
-#
 
+
+# IP scraper
 CLSTR_IPS="${INFO_CACHE}/cluster_ips.json"
-
-# Retrieve the list of cluster IPs in JSON format if the file does not exist or is empty
 if [ ! -s ${CLSTR_IPS} ]; then
     if ! cloudctl ip list -o json > ${CLSTR_IPS}; then
         echo "error: failed to execute 'cloudctl ip list -o json' command"
@@ -78,7 +99,6 @@ if [ ! -s ${CLSTR_IPS} ]; then
         exit 1
     fi
 
-   # Verify that the file was successfully created and filled
     if [ ! -s ${CLSTR_IPS} ]; then
         echo "error: 'cloudctl ip list' did not produce output in '${CLSTR_IPS}'"
         debug_crawler_error
@@ -86,12 +106,11 @@ if [ ! -s ${CLSTR_IPS} ]; then
     fi
 fi
 
-#
-# Aufstellung / mapping über Namen und ID unserer cluster
-#
+
+
+# NAMEID scraper
 NAMEID_MAP="${INFO_CACHE}/name_id.map"
 if [ ! -s ${NAMEID_MAP} ]; then
-    # create empty file
     > ${NAMEID_MAP}
 
     echo "debug: unsere cluster sind '${UNSERE_CLUSTER}'"
@@ -103,17 +122,16 @@ if [ ! -s ${NAMEID_MAP} ]; then
             exit 1
         fi
     done
+
+    if [ ! -s ${NAMEID_MAP} ]; then
+        echo "error: failed to create / fill '${NAMEID_MAP}'"
+        debug_crawler_error
+        exit 1
+    fi
 fi
 
-if [ ! -s ${NAMEID_MAP} ]; then
-    echo "error: failed to create / fill '${NAMEID_MAP}'"
-    debug_crawler_error
-    exit 1
-fi
 
-#
-# für jeden unserer cluster die gesamte Info holen
-#
+#Cluster Describer
 for line in $(cat ${NAMEID_MAP}); do
     CLSTRNM=$(echo ${line} | cut -f 1 -d ";")
     CLSTRID=$(echo ${line} | cut -f 2 -d ";")
@@ -121,8 +139,13 @@ for line in $(cat ${NAMEID_MAP}); do
 
     CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
     if [ ! -s ${CLSTR_INFO} ]; then
-        cloudctl cluster describe ${CLSTRID} -o json > ${CLSTR_INFO}
+        if ! cloudctl cluster describe ${CLSTRID} -o json > ${CLSTR_INFO}; then
+            echo "error: failed to describe cluster '${CLSTRNM}' with ID '${CLSTRID}'"
+            debug_crawler_error
+            exit 1
+        fi
     fi
+
     if [ ! -s ${CLSTR_INFO} ]; then
         echo "error: failed to create / fill '${CLSTR_INFO}'"
         debug_crawler_error
@@ -130,19 +153,39 @@ for line in $(cat ${NAMEID_MAP}); do
     fi
 done
 
+
+#Kubernetes Data Collector
+# Loop through each line in NAMEID_MAP and retrieve Kubernetes cluster information
 for line in $(cat ${NAMEID_MAP}); do
     CLSTRNM=$(echo ${line} | cut -f 1 -d ";")
     echo "debug: will kubectl cluster content for ${CLSTRNM}"
 
-    #
-    # keine Ahnung, wie man "modern" jetzt jeweils auf den jeweiligen, entsprechenden kube context umschaltet
-    #   also so, dass der kubectl gegen den entsprechenden cluster geht
-    #
-
+    #Define file paths for storing cluster information
     CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
-    # kubectl get pods -A
     CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.json"
-    # kubectl get ingress -A
+
+    # Switch to the appropriate kube context for the cluster
+    # Assuming a command or function set_kube_context that sets the kube context
+    if ! set_kube_context "${CLSTRNM}"; then
+        echo "error: failed to set kube context for cluster '${CLSTRNM}'"
+        debug_crawler_error
+        exit 1
+    fi
+
+    # Retrieve and store pod information
+    if ! kubectl get pods -A -o json > "${CLSTR_PODS}"; then
+        echo "error: failed to retrieve pods for cluster '${CLSTRNM}'"
+        debug_crawler_error
+        exit 1
+    fi
+
+    # Retrieve and store ingress information
+    if ! kubectl get ingress -A -o json > "${CLSTR_INGRESS}"; then
+        echo "error: failed to retrieve ingress for cluster '${CLSTRNM}'"
+        debug_crawler_error
+        exit 1
+    fi
+
 done
 
 exit 0
