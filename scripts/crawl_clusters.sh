@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Script to collect data from all "our" clusters
+# Skript zum Sammeln von Daten aller "unserer" Cluster
 
 UNSERE_CLUSTER="fttc ftctl"
 
-# Function to create a directory if it doesn't exist
+# Funktion zum Erstellen eines Verzeichnisses, falls es nicht existiert
 create_directory() {
     locDir="${1}"
     if [ ! -d ${locDir} ]; then
@@ -17,7 +17,7 @@ create_directory() {
     return 0
 }
 
-# Function to create an empty directory (remove if exists, then create)
+# Funktion zum Erstellen eines leeren Verzeichnisses (falls vorhanden, wird es entfernt, dann neu erstellt)
 create_empty_directory() {
     locDir="${1}"
     rm -rf ${locDir} > /dev/null 2>&1
@@ -25,7 +25,7 @@ create_empty_directory() {
     return $?
 }
 
-# Function to set the Kubernetes context for a given cluster
+# Funktion zum Setzen des Kubernetes-Kontexts für einen gegebenen Cluster
 set_kube_context() {
     local CLUSTER_NAME="$1"
     local CONTEXT_NAME="context-${CLUSTER_NAME}"
@@ -39,14 +39,14 @@ set_kube_context() {
     fi
 }
 
-# Main script starts here
+# Ab hier beginnt das Hauptskript
 
-# Variables for timestamp, results directory, and temporary directory
+# Variablen für Zeitstempel, Ergebnisverzeichnis und temporäres Verzeichnis
 DAYSTAMP="$(date +"%Y%m%d")"
 RESULTS_DIR="results"
 TMPS_DIR="tmps"
 
-# Create results and temporary directories
+# Erstellen von Ergebnis- und temporären Verzeichnissen
 create_empty_directory "${RESULTS_DIR}"
 if [ $? -ne 0 ]; then
     exit 1
@@ -56,7 +56,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Set up the info cache directory
+# Einrichten des Info-Cache-Verzeichnisses
 INFO_CACHE="info_cache_${DAYSTAMP}"
 
 if [ "${FORCE_REBUILD}" == "1" ]; then
@@ -72,19 +72,19 @@ else
 fi
 
 if [ ! -d ${INFO_CACHE} ]; then
-    # Possibly a new day, so delete all old info_cache directories
+    # Möglicherweise ein neuer Tag, daher alle alten info_cache Verzeichnisse löschen
     rm -rf info_cache_* > /dev/null 2>&1
     create_empty_directory ${INFO_CACHE}
 fi
 
-# Function to log errors and debugging information
+# Funktion zum Protokollieren von Fehlern und Debugging-Informationen
 debug_crawler_error() {
     pwd
     ls -al
     ls -al ${INFO_CACHE}
 }
 
-# IP Scraper: Retrieve and store the IP addresses of all clusters
+# IP Scraper: Abrufen und Speichern der IP-Adressen aller Cluster
 CLSTR_IPS="${INFO_CACHE}/cluster_ips.json"
 if [ ! -s ${CLSTR_IPS} ]; then
     if ! cloudctl ip list -o json > ${CLSTR_IPS}; then
@@ -100,7 +100,7 @@ if [ ! -s ${CLSTR_IPS} ]; then
     fi
 fi
 
-# NAMEID Scraper: Retrieve and store the name-ID mapping of all clusters
+# NAMEID Scraper: Abrufen und Speichern der Name-ID-Zuordnung aller Cluster
 NAMEID_MAP="${INFO_CACHE}/name_id.map"
 if [ ! -s ${NAMEID_MAP} ]; then
     > ${NAMEID_MAP}
@@ -108,7 +108,7 @@ if [ ! -s ${NAMEID_MAP} ]; then
     echo "debug: unsere cluster sind '${UNSERE_CLUSTER}'"
     for tnt in ${UNSERE_CLUSTER}; do
         echo "debug: tenant is ${tnt}"
-        # Check if clusters are listed for each tenant and append them to the map
+        # Überprüfen, ob Cluster für jeden Tenant aufgelistet sind und sie zur Map hinzufügen
         if ! cloudctl cluster list --tenant ${tnt} | grep -v "NAME" | awk '{ print $4";"$1 }' >> ${NAMEID_MAP}; then
             echo "error: failed to list clusters for tenant '${tnt}'"
             debug_crawler_error
@@ -116,7 +116,7 @@ if [ ! -s ${NAMEID_MAP} ]; then
         fi
     done
 
-    # Final check to ensure the name_id.map file is populated
+    # Letzte Überprüfung, ob die name_id.map Datei gefüllt ist
     if [ ! -s ${NAMEID_MAP} ]; then
         echo "error: failed to create / fill '${NAMEID_MAP}'"
         debug_crawler_error
@@ -124,7 +124,7 @@ if [ ! -s ${NAMEID_MAP} ]; then
     fi
 fi
 
-# Cluster Describer: Retrieve and store detailed information for each cluster
+# Cluster Describer: Abrufen und Speichern detaillierter Informationen für jeden Cluster
 for line in $(cat ${NAMEID_MAP}); do
     CLSTRNM=$(echo ${line} | cut -f 1 -d ";")
     CLSTRID=$(echo ${line} | cut -f 2 -d ";")
@@ -146,30 +146,30 @@ for line in $(cat ${NAMEID_MAP}); do
     fi
 done
 
-# Kubernetes Data Collector: Retrieve and store Kubernetes information (pods and ingress) for each cluster
+# Kubernetes Data Collector: Abrufen und Speichern von Kubernetes-Informationen (Pods und Ingress) für jeden Cluster
 for line in $(cat ${NAMEID_MAP}); do
     CLSTRNM=$(echo ${line} | cut -f 1 -d ";")
     echo "debug: will kubectl cluster content for ${CLSTRNM}"
 
-    # Define file paths for storing cluster information
+    # Dateipfade für das Speichern von Clusterinformationen definieren
     CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
     CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.json"
 
-    # Switch to the appropriate kube context for the cluster
+    # Zum entsprechenden kube Kontext für den Cluster wechseln
     if ! set_kube_context "${CLSTRNM}"; then
         echo "error: failed to set kube context for cluster '${CLSTRNM}'"
         debug_crawler_error
         exit 1
     fi
 
-    # Retrieve and store pod information
+    # Abrufen und Speichern von Pod-Informationen
     if ! kubectl get pods -A -o json > "${CLSTR_PODS}"; then
         echo "error: failed to retrieve pods for cluster '${CLSTRNM}'"
         debug_crawler_error
         exit 1
     fi
 
-    # Retrieve and store ingress information
+    # Abrufen und Speichern von Ingress-Informationen
     if ! kubectl get ingress -A -o json > "${CLSTR_INGRESS}"; then
         echo "error: failed to retrieve ingress for cluster '${CLSTRNM}'"
         debug_crawler_error
