@@ -97,9 +97,14 @@ if [ ! -s ${NAMEID_MAP} ]; then
     echo "debug: unsere cluster sind '${UNSERE_CLUSTER}'"
     for tnt in $(echo ${UNSERE_CLUSTER}); do
         echo "debug: tenant is ${tnt}"
-        cloudctl cluster list --tenant ${tnt} | grep -v "NAME" | awk '{ print $4";"$1 }' >> ${NAMEID_MAP}
+        if ! cloudctl cluster list --tenant ${tnt} | grep -v "NAME" | awk '{ print $4";"$1 }' >> ${NAMEID_MAP}; then
+            echo "error: failed to list clusters for tenant '${tnt}'"
+            debug_crawler_error
+            exit 1
+        fi
     done
 fi
+
 if [ ! -s ${NAMEID_MAP} ]; then
     echo "error: failed to create / fill '${NAMEID_MAP}'"
     debug_crawler_error
