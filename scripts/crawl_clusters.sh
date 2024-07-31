@@ -67,14 +67,23 @@ debug_crawler_error() {
 #
 # alle IPs aller cluster
 #
+
 CLSTR_IPS="${INFO_CACHE}/cluster_ips.json"
+
+# Retrieve the list of cluster IPs in JSON format if the file does not exist or is empty
 if [ ! -s ${CLSTR_IPS} ]; then
-    cloudctl ip list -o json > ${CLSTR_IPS}
-fi
-if [ ! -s ${CLSTR_IPS} ]; then
-    echo "error: failed to create / fill '${CLSTR_IPS}'"
-    debug_crawler_error
-    exit 1
+    if ! cloudctl ip list -o json > ${CLSTR_IPS}; then
+        echo "error: failed to execute 'cloudctl ip list -o json' command"
+        debug_crawler_error
+        exit 1
+    fi
+
+   # Verify that the file was successfully created and filled
+    if [ ! -s ${CLSTR_IPS} ]; then
+        echo "error: 'cloudctl ip list' did not produce output in '${CLSTR_IPS}'"
+        debug_crawler_error
+        exit 1
+    fi
 fi
 
 #
