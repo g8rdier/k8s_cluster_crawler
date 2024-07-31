@@ -8,7 +8,7 @@ UNSERE_CLUSTER="fttc ftctl"
 create_directory() {
     locDir="${1}"
     if [ ! -d ${locDir} ]; then
-        mkdir ${locDir} > /dev/null
+        mkdir -p ${locDir} > /dev/null
     fi
     if [ ! -d ${locDir} ]; then
         echo "error: failed to create directory '${locDir}'"
@@ -43,8 +43,9 @@ set_kube_context() {
 
 # Variablen für Zeitstempel, Ergebnisverzeichnis und temporäres Verzeichnis
 DAYSTAMP="$(date +"%Y%m%d")"
+WEEKNUM="$(date +"%V")"
 RESULTS_DIR="results"
-TMPS_DIR="tmps"
+TMPS_DIR="tmps/week_${WEEKNUM}"
 
 # Erstellen von Ergebnis- und temporären Verzeichnissen
 create_empty_directory "${RESULTS_DIR}"
@@ -57,7 +58,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Einrichten des Info-Cache-Verzeichnisses
-INFO_CACHE="info_cache_${DAYSTAMP}"
+INFO_CACHE="${TMPS_DIR}/info_cache_${DAYSTAMP}"
 
 if [ "${FORCE_REBUILD}" == "1" ]; then
     echo "info: environment variable 'FORCE_REBUILD' is set to 1, refreshing all cached cluster information"
@@ -73,7 +74,7 @@ fi
 
 if [ ! -d ${INFO_CACHE} ]; then
     # Möglicherweise ein neuer Tag, daher alle alten info_cache Verzeichnisse löschen
-    rm -rf info_cache_* > /dev/null 2>&1
+    rm -rf ${TMPS_DIR}/info_cache_* > /dev/null 2>&1
     create_empty_directory ${INFO_CACHE}
 fi
 
