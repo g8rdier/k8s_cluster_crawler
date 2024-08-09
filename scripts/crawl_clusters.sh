@@ -25,7 +25,6 @@ create_empty_directory() {
     locDir="${1}"
     rm -rf "${locDir}" > /dev/null 2>&1
     create_directory "${locDir}"
-    return $?
 }
 
 # Funktion zum Setzen des Kubernetes-Kontexts für einen gegebenen Cluster
@@ -47,12 +46,10 @@ RESULTS_DIR="results"
 TMPS_DIR="tmps/week_${WEEKNUM}"
 
 # Erstellen von Ergebnis- und temporären Verzeichnissen
-create_empty_directory "${RESULTS_DIR}"
-if [ $? -ne 0 ]; then
+if ! create_empty_directory "${RESULTS_DIR}"; then
     exit 1
 fi
-create_empty_directory "${TMPS_DIR}"
-if [ $? -ne 0 ]; then
+if ! create_empty_directory "${TMPS_DIR}"; then
     exit 1
 fi
 
@@ -103,7 +100,7 @@ fi
 # NAMEID Scraper: Abrufen und Speichern der Name-ID-Zuordnung aller Cluster
 NAMEID_MAP="${INFO_CACHE}/name_id.map"
 if [ ! -s "${NAMEID_MAP}" ]; then
-    > "${NAMEID_MAP}"
+    : > "${NAMEID_MAP}"  # Dies stellt sicher, dass die Datei erstellt oder geleert wird, ohne unnötige Kommandosubstitution zu verwenden
 
     echo "debug: unsere cluster sind '${UNSERE_CLUSTER}'"
     for tnt in ${UNSERE_CLUSTER}; do
@@ -125,7 +122,7 @@ if [ ! -s "${NAMEID_MAP}" ]; then
 fi
 
 # Cluster Describer: Abrufen und Speichern detaillierter Informationen für jeden Cluster
-while IFS= read -r line; do
+for line in $(cat "${NAMEID_MAP}"); do
     CLSTRNM=$(echo "${line}" | cut -f 1 -d ";")
     CLSTRID=$(echo "${line}" | cut -f 2 -d ";")
     echo "debug: will describe ${CLSTRNM} with ${CLSTRID}"
@@ -144,10 +141,10 @@ while IFS= read -r line; do
         debug_crawler_error
         exit 1
     fi
-done < "${NAMEID_MAP}"
+done
 
 # Kubernetes Data Collector: Abrufen und Speichern von Kubernetes-Informationen (Pods und Ingress) für jeden Cluster
-while IFS= read -r line; do
+for line in $(cat "${NAMEID_MAP}"); do
     CLSTRNM=$(echo "${line}" | cut -f 1 -d ";")
     echo "debug: will kubectl cluster content for ${CLSTRNM}"
 
@@ -175,10 +172,10 @@ while IFS= read -r line; do
         debug_crawler_error
         exit 1
     fi
-done < "${NAMEID_MAP}"
+done
 
 # Doppelte Überprüfung, ob alle Cluster aus name_id.map verarbeitet wurden
-while IFS= read -r line; do
+for line in $(cat "${NAMEID_MAP}"); do
     CLSTRNM=$(echo "${line}" | cut -f 1 -d ";")
     CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
     
@@ -187,11 +184,11 @@ while IFS= read -r line; do
         debug_crawler_error
         ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=false
     fi
-done < "${NAMEID_MAP}"
+done
 
 # Cleanup-Funktion für das Entfernen der Dateien, wenn alle Cluster erfolgreich verarbeitet wurden
 cleanup() {
-    if [ "${ALL_CLUSTERS_PROCESSED_SUCCESSFULLY}" = true ]; then
+    if [ "$ALL_CLUSTERS_PROCESSED_SUCCESSFULLY" = true ]; then
         echo "Info: Alle Cluster wurden erfolgreich verarbeitet, name_id.map und cluster_ips.json werden entfernt"
         rm -f "${NAMEID_MAP}"
         rm -f "${CLSTR_IPS}"
