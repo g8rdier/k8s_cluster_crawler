@@ -122,9 +122,7 @@ if [ ! -s "${NAMEID_MAP}" ]; then
 fi
 
 # Cluster Describer: Abrufen und Speichern detaillierter Informationen für jeden Cluster
-for line in $(cat "${NAMEID_MAP}"); do
-    CLSTRNM=$(echo "${line}" | cut -f 1 -d ";")
-    CLSTRID=$(echo "${line}" | cut -f 2 -d ";")
+while IFS=";" read -r CLSTRNM CLSTRID; do
     echo "debug: will describe ${CLSTRNM} with ${CLSTRID}"
 
     CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
@@ -141,11 +139,10 @@ for line in $(cat "${NAMEID_MAP}"); do
         debug_crawler_error
         exit 1
     fi
-done
+done < "${NAMEID_MAP}"
 
 # Kubernetes Data Collector: Abrufen und Speichern von Kubernetes-Informationen (Pods und Ingress) für jeden Cluster
-for line in $(cat "${NAMEID_MAP}"); do
-    CLSTRNM=$(echo "${line}" | cut -f 1 -d ";")
+while IFS=";" read -r CLSTRNM CLSTRID; do
     echo "debug: will kubectl cluster content for ${CLSTRNM}"
 
     # Dateipfade für das Speichern von Clusterinformationen definieren
@@ -172,11 +169,10 @@ for line in $(cat "${NAMEID_MAP}"); do
         debug_crawler_error
         exit 1
     fi
-done
+done < "${NAMEID_MAP}"
 
 # Doppelte Überprüfung, ob alle Cluster aus name_id.map verarbeitet wurden
-for line in $(cat "${NAMEID_MAP}"); do
-    CLSTRNM=$(echo "${line}" | cut -f 1 -d ";")
+while IFS=";" read -r CLSTRNM CLSTRID; do
     CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
     
     if [ ! -s "${CLSTR_INFO}" ]; then
@@ -184,7 +180,7 @@ for line in $(cat "${NAMEID_MAP}"); do
         debug_crawler_error
         ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=false
     fi
-done
+done < "${NAMEID_MAP}"
 
 # Cleanup-Funktion für das Entfernen der Dateien, wenn alle Cluster erfolgreich verarbeitet wurden
 cleanup() {
