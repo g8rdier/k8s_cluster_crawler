@@ -27,14 +27,11 @@ create_empty_directory() {
 
 # Funktion zum Setzen des Kubernetes-Kontexts für einen gegebenen Cluster
 set_kube_context() {
-    local CLUSTER_NAME="$1"
-    local CONTEXT_NAME="context-${CLUSTER_NAME}"
-    
-    if kubectl config use-context "${CONTEXT_NAME}"; then
-        echo "Successfully switched to context ${CONTEXT_NAME}"
+    if kubectl config use-context "${1}"; then
+        echo "Successfully switched to context ${1}"
         return 0
     else
-        echo "Failed to switch to context ${CONTEXT_NAME}"
+        echo "Failed to switch to context ${1}"
         return 1
     fi
 }
