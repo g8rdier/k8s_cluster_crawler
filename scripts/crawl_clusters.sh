@@ -4,6 +4,9 @@
 
 UNSERE_CLUSTER="fttc ftctl"
 
+# Setzt die Umgebungsvariable FORCE_REBUILD
+FORCE_REBUILD=1
+
 # Funktion zum Erstellen eines Verzeichnisses, falls es nicht existiert
 create_directory() {
     locDir="${1}"
@@ -40,7 +43,6 @@ set_kube_context() {
 
 # Variablen für Zeitstempel, Ergebnisverzeichnis und temporäres Verzeichnis
 DAYSTAMP="$(date +"%Y%m%d")"
-WEEKNUM="$(date +"%V")"
 RESULTS_DIR="results"
 TMPS_DIR="tmps/week_${WEEKNUM}"
 
@@ -174,5 +176,29 @@ for line in $(cat ${NAMEID_MAP}); do
         exit 1
     fi
 done
+
+# Doppelte Überprüfung, ob alle Cluster aus name_id.map verarbeitet wurden
+for line in $(cat ${NAMEID_MAP}); do
+    CLSTRNM=$(echo ${line} | cut -f 1 -d ";")
+    CLSTR_INFO="${TMPS_DIR}/${CLSTRNM}_describe.json"
+    
+    if [ ! -s ${CLSTR_INFO} ]; then
+        echo "Fehler: Cluster '${CLSTRNM}' wurde nicht korrekt verarbeitet"
+        debug_crawler_error
+        ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=false
+    fi
+done
+
+# Cleanup-Funktion für das Entfernen der Dateien, wenn alle Cluster erfolgreich verarbeitet wurden
+cleanup() {
+    if [ "$ALL_CLUSTERS_PROCESSED_SUCCESSFULLY" = true ]; then
+        echo "Info: Alle Cluster wurden erfolgreich verarbeitet, name_id.map und cluster_ips.json werden entfernt"
+        rm -f ${NAMEID_MAP}
+        rm -f ${CLSTR_IPS}
+    else
+        echo "Info: Einige Cluster wurden nicht erfolgreich verarbeitet, name_id.map und cluster_ips.json bleiben zur weiteren Überprüfung erhalten."
+    fi
+}
+trap cleanup EXIT
 
 exit 0
