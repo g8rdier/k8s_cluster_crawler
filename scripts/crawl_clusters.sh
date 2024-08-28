@@ -1,11 +1,13 @@
 #!/bin/bash
 
+# set -x
+
 # Skript zum Sammeln von Daten aller "unserer" Cluster
 
 UNSERE_CLUSTER="fttc ftctl"
 
 # Setzt die Umgebungsvariable FORCE_REBUILD
-FORCE_REBUILD=1
+# FORCE_REBUILD=1
 
 # Funktion zum Erstellen eines Verzeichnisses, falls es nicht existiert
 create_directory() {
@@ -43,35 +45,24 @@ set_kube_context() {
 # Variablen für Zeitstempel, Ergebnisverzeichnis und temporäres Verzeichnis
 DAYSTAMP="$(date +"%Y%m%d")"
 RESULTS_DIR="results"
-TMPS_DIR="tmps/week_${WEEKNUM}"
 
 # Erstellen von Ergebnis- und temporären Verzeichnissen
 if ! create_empty_directory "${RESULTS_DIR}"; then
     exit 1
 fi
-if ! create_empty_directory "${TMPS_DIR}"; then
+
+# Einrichten des Info-Cache-Verzeichnisses
+INFO_CACHE="info_cache_${DAYSTAMP}"
+
+if ! create_directory "${INFO_CACHE}"; then
     exit 1
 fi
 
-# Einrichten des Info-Cache-Verzeichnisses
-INFO_CACHE="${TMPS_DIR}/info_cache_${DAYSTAMP}"
-
 if [ "${FORCE_REBUILD}" == "1" ]; then
     echo "info: environment variable 'FORCE_REBUILD' is set to 1, refreshing all cached cluster information"
-    rm -rf "${INFO_CACHE}" > /dev/null 2>&1
-
-    if [ -d "${INFO_CACHE}" ]; then
-        echo "error: failed to clear cache '${INFO_CACHE}'"
-        exit 1
-    fi
+    rm -rf "${INFO_CACHE}/*" > /dev/null 2>&1
 else
     echo "info: environment variable 'FORCE_REBUILD' not set to 1, using cached cluster information"
-fi
-
-if [ ! -d "${INFO_CACHE}" ]; then
-    # Möglicherweise ein neuer Tag, daher alle alten info_cache Verzeichnisse löschen
-    rm -rf "${TMPS_DIR}/info_cache_*" > /dev/null 2>&1
-    create_empty_directory "${INFO_CACHE}"
 fi
 
 # Funktion zum Protokollieren von Fehlern und Debugging-Informationen
@@ -149,6 +140,12 @@ while IFS=";" read -r CLSTRNM CLSTRID; do
     CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
     CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.json"
 
+    # Überprüfen, ob der kube context existiert
+    if ! kubectl config get-contexts "${CLSTRNM}" &> /dev/null; then
+        echo "Warning: No kube context found for cluster '${CLSTRNM}', skipping..."
+        continue
+    fi
+
     # Zum entsprechenden kube Kontext für den Cluster wechseln
     if ! set_kube_context "${CLSTRNM}"; then
         echo "error: failed to set kube context for cluster '${CLSTRNM}'"
@@ -171,7 +168,11 @@ while IFS=";" read -r CLSTRNM CLSTRID; do
     fi
 done < "${NAMEID_MAP}"
 
+
 # Doppelte Überprüfung, ob alle Cluster aus name_id.map verarbeitet wurden
+
+ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=true
+
 while IFS=";" read -r CLSTRNM CLSTRID; do
     CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
     
@@ -184,7 +185,7 @@ done < "${NAMEID_MAP}"
 
 # Cleanup-Funktion für das Entfernen der Dateien, wenn alle Cluster erfolgreich verarbeitet wurden
 cleanup() {
-    if [ "$ALL_CLUSTERS_PROCESSED_SUCCESSFULLY" = true ]; then
+    if [ $ALL_CLUSTERS_PROCESSED_SUCCESSFULLY == true ]; then
         echo "Info: Alle Cluster wurden erfolgreich verarbeitet, name_id.map und cluster_ips.json werden entfernt"
         rm -f "${NAMEID_MAP}"
         rm -f "${CLSTR_IPS}"
@@ -195,3 +196,4 @@ cleanup() {
 trap cleanup EXIT
 
 exit 0
+
