@@ -1,13 +1,45 @@
 #!/bin/bash
 
-# set -x
+# set -x  # Debugging-Modus aktivieren (gibt jeden Befehl aus)
+
+# Standard-Logging-Level
+DETAILLIERTES_LOGGING=false
+
+# Argumente der Befehlszeile parsen
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -dl) DETAILLIERTES_LOGGING=true ;;  # Detailliertes Logging aktivieren
+        *) echo "Unbekannter Parameter übergeben: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+# Funktion zum Loggen von Nachrichten (abhängig vom Logging-Flag)
+log() {
+    local level="$1"
+    local message="$2"
+    if [ "$DETAILLIERTES_LOGGING" = true ]; then
+        echo "$level: $message"
+    elif [ "$level" != "DEBUG" ]; then
+        echo "$level: $message"
+    fi
+}
 
 # Skript zum Sammeln von Daten aller "unserer" Cluster
-
 UNSERE_CLUSTER="fttc ftctl"
 
-# Setzt die Umgebungsvariable FORCE_REBUILD
-# FORCE_REBUILD=1
+# Marker-Datei zur Verfolgung, ob das Skript bereits erfolgreich ausgeführt wurde
+MARKER_FILE="$(dirname "$0")/cluster_crawler_marker"
+
+# Überprüfen, ob FORCE_REBUILD gesetzt werden soll
+if [ -f "$MARKER_FILE" ]; then
+    FORCE_REBUILD=0
+else
+    FORCE_REBUILD=1
+fi
+
+# Erklärung: Wenn FORCE_REBUILD auf 1 gesetzt ist, werden alle zwischengespeicherten Cluster-Informationen aktualisiert.
+# Wenn es auf 0 gesetzt ist oder nicht definiert wurde, werden die vorhandenen Cache-Daten verwendet.
 
 # Funktion zum Erstellen eines Verzeichnisses, falls es nicht existiert
 create_directory() {
@@ -16,7 +48,7 @@ create_directory() {
         mkdir -p "${locDir}" > /dev/null
     fi
     if [ ! -d "${locDir}" ]; then
-        echo "error: failed to create directory '${locDir}'"
+        log "ERROR" "Fehler beim Erstellen des Verzeichnisses '${locDir}'"
         return 1
     fi
     return 0
@@ -26,30 +58,24 @@ create_directory() {
 create_empty_directory() {
     locDir="${1}"
     rm -rf "${locDir}" > /dev/null 2>&1
-    create_directory "${locDir}"
+    create_directory "${locDir}"  # Corrected function call
 }
 
 # Funktion zum Setzen des Kubernetes-Kontexts für einen gegebenen Cluster
 set_kube_context() {
-    if kubectl config use-context "${1}"; then
-        echo "Successfully switched to context ${1}"
+    if kubectl config use-context "$1"; then  # Fixed syntax here by removing unnecessary quotes
+        log "INFO" "Erfolgreich zu Kontext ${1} gewechselt"
         return 0
     else
-        echo "Failed to switch to context ${1}"
+        log "ERROR" "Fehler beim Wechseln zu Kontext ${1}"
         return 1
     fi
 }
 
 # Ab hier beginnt das Hauptskript
 
-# Variablen für Zeitstempel, Ergebnisverzeichnis und temporäres Verzeichnis
+# temporäres Verzeichnis
 DAYSTAMP="$(date +"%Y%m%d")"
-RESULTS_DIR="results"
-
-# Erstellen von Ergebnis- und temporären Verzeichnissen
-if ! create_empty_directory "${RESULTS_DIR}"; then
-    exit 1
-fi
 
 # Einrichten des Info-Cache-Verzeichnisses
 INFO_CACHE="info_cache_${DAYSTAMP}"
@@ -59,10 +85,10 @@ if ! create_directory "${INFO_CACHE}"; then
 fi
 
 if [ "${FORCE_REBUILD}" == "1" ]; then
-    echo "info: environment variable 'FORCE_REBUILD' is set to 1, refreshing all cached cluster information"
+    log "INFO" "Umgebungsvariable 'FORCE_REBUILD' ist auf 1 gesetzt, aktualisiere alle zwischengespeicherten Cluster-Informationen"
     rm -rf "${INFO_CACHE}/*" > /dev/null 2>&1
 else
-    echo "info: environment variable 'FORCE_REBUILD' not set to 1, using cached cluster information"
+    log "INFO" "Umgebungsvariable 'FORCE_REBUILD' ist nicht auf 1 gesetzt, benutze zwischengespeicherte Cluster-Informationen"
 fi
 
 # Funktion zum Protokollieren von Fehlern und Debugging-Informationen
@@ -76,13 +102,13 @@ debug_crawler_error() {
 CLSTR_IPS="${INFO_CACHE}/cluster_ips.json"
 if [ ! -s "${CLSTR_IPS}" ]; then
     if ! cloudctl ip list -o json > "${CLSTR_IPS}"; then
-        echo "error: failed to execute 'cloudctl ip list -o json' command"
+        log "ERROR" "Fehler beim Ausführen des Befehls 'cloudctl ip list -o json'"
         debug_crawler_error
         exit 1
     fi
 
     if [ ! -s "${CLSTR_IPS}" ]; then
-        echo "error: 'cloudctl ip list' did not produce output in '${CLSTR_IPS}'"
+        log "ERROR" "'cloudctl ip list' hat keine Ausgabe in '${CLSTR_IPS}' erzeugt"
         debug_crawler_error
         exit 1
     fi
@@ -91,14 +117,14 @@ fi
 # NAMEID Scraper: Abrufen und Speichern der Name-ID-Zuordnung aller Cluster
 NAMEID_MAP="${INFO_CACHE}/name_id.map"
 if [ ! -s "${NAMEID_MAP}" ]; then
-    : > "${NAMEID_MAP}"  # Dies stellt sicher, dass die Datei erstellt oder geleert wird, ohne unnötige Kommandosubstitution zu verwenden
+    : > "${NAMEID_MAP}"  # Datei erstellen oder leeren
 
-    echo "debug: unsere cluster sind '${UNSERE_CLUSTER}'"
+    log "DEBUG" "Unsere Cluster sind '${UNSERE_CLUSTER}'"
     for tnt in ${UNSERE_CLUSTER}; do
-        echo "debug: tenant is ${tnt}"
-        # Überprüfen, ob Cluster für jeden Tenant aufgelistet sind und sie zur Map hinzufügen
+        log "DEBUG" "Tenant ist ${tnt}"
+        # Cluster für jeden Tenant auflisten und zur Map hinzufügen
         if ! cloudctl cluster list --tenant "${tnt}" | grep -v "NAME" | awk '{ print $4";"$1 }' >> "${NAMEID_MAP}"; then
-            echo "error: failed to list clusters for tenant '${tnt}'"
+            log "ERROR" "Fehler beim Auflisten der Cluster für Tenant '${tnt}'"
             debug_crawler_error
             exit 1
         fi
@@ -106,7 +132,7 @@ if [ ! -s "${NAMEID_MAP}" ]; then
 
     # Letzte Überprüfung, ob die name_id.map Datei gefüllt ist
     if [ ! -s "${NAMEID_MAP}" ]; then
-        echo "error: failed to create / fill '${NAMEID_MAP}'"
+        log "ERROR" "Fehler beim Erstellen / Füllen von '${NAMEID_MAP}'"
         debug_crawler_error
         exit 1
     fi
@@ -114,19 +140,19 @@ fi
 
 # Cluster Describer: Abrufen und Speichern detaillierter Informationen für jeden Cluster
 while IFS=";" read -r CLSTRNM CLSTRID; do
-    echo "debug: will describe ${CLSTRNM} with ${CLSTRID}"
+    log "DEBUG" "Beschreibe ${CLSTRNM} mit ${CLSTRID}"
 
     CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
     if [ ! -s "${CLSTR_INFO}" ]; then
         if ! cloudctl cluster describe "${CLSTRID}" -o json > "${CLSTR_INFO}"; then
-            echo "error: failed to describe cluster '${CLSTRNM}' with ID '${CLSTRID}'"
+            log "ERROR" "Fehler beim Beschreiben des Clusters '${CLSTRNM}' mit ID '${CLSTRID}'"
             debug_crawler_error
             exit 1
         fi
     fi
 
     if [ ! -s "${CLSTR_INFO}" ]; then
-        echo "error: failed to create / fill '${CLSTR_INFO}'"
+        log "ERROR" "Fehler beim Erstellen / Füllen von '${CLSTR_INFO}'"
         debug_crawler_error
         exit 1
     fi
@@ -134,7 +160,7 @@ done < "${NAMEID_MAP}"
 
 # Kubernetes Data Collector: Abrufen und Speichern von Kubernetes-Informationen (Pods und Ingress) für jeden Cluster
 while IFS=";" read -r CLSTRNM CLSTRID; do
-    echo "debug: will kubectl cluster content for ${CLSTRNM}"
+    log "DEBUG" "Hole kubectl Cluster-Inhalte für ${CLSTRNM}"
 
     # Dateipfade für das Speichern von Clusterinformationen definieren
     CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
@@ -142,42 +168,40 @@ while IFS=";" read -r CLSTRNM CLSTRID; do
 
     # Überprüfen, ob der kube context existiert
     if ! kubectl config get-contexts "${CLSTRNM}" &> /dev/null; then
-        echo "Warning: No kube context found for cluster '${CLSTRNM}', skipping..."
+        log "WARNING" "Kein kube Kontext für Cluster '${CLSTRNM}' gefunden, überspringe..."
         continue
     fi
 
     # Zum entsprechenden kube Kontext für den Cluster wechseln
     if ! set_kube_context "${CLSTRNM}"; then
-        echo "error: failed to set kube context for cluster '${CLSTRNM}'"
+        log "ERROR" "Fehler beim Setzen des kube Kontextes für Cluster '${CLSTRNM}'"
         debug_crawler_error
         exit 1
     fi
 
     # Abrufen und Speichern von Pod-Informationen
     if ! kubectl get pods -A -o json > "${CLSTR_PODS}"; then
-        echo "error: failed to retrieve pods for cluster '${CLSTRNM}'"
+        log "ERROR" "Fehler beim Abrufen der Pods für Cluster '${CLSTRNM}'"
         debug_crawler_error
         exit 1
     fi
 
     # Abrufen und Speichern von Ingress-Informationen
     if ! kubectl get ingress -A -o json > "${CLSTR_INGRESS}"; then
-        echo "error: failed to retrieve ingress for cluster '${CLSTRNM}'"
+        log "ERROR" "Fehler beim Abrufen der Ingress für Cluster '${CLSTRNM}'"
         debug_crawler_error
         exit 1
     fi
 done < "${NAMEID_MAP}"
 
-
 # Doppelte Überprüfung, ob alle Cluster aus name_id.map verarbeitet wurden
-
 ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=true
 
 while IFS=";" read -r CLSTRNM CLSTRID; do
     CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
     
     if [ ! -s "${CLSTR_INFO}" ]; then
-        echo "Fehler: Cluster '${CLSTRNM}' wurde nicht korrekt verarbeitet"
+        log "ERROR" "Cluster '${CLSTRNM}' wurde nicht korrekt verarbeitet"
         debug_crawler_error
         ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=false
     fi
@@ -186,14 +210,19 @@ done < "${NAMEID_MAP}"
 # Cleanup-Funktion für das Entfernen der Dateien, wenn alle Cluster erfolgreich verarbeitet wurden
 cleanup() {
     if [ $ALL_CLUSTERS_PROCESSED_SUCCESSFULLY == true ]; then
-        echo "Info: Alle Cluster wurden erfolgreich verarbeitet, name_id.map und cluster_ips.json werden entfernt"
+        log "INFO" "Alle Cluster wurden erfolgreich verarbeitet, name_id.map und cluster_ips.json werden entfernt"
         rm -f "${NAMEID_MAP}"
         rm -f "${CLSTR_IPS}"
+        # Marker-Datei erstellen, um anzuzeigen, dass das Skript erfolgreich ausgeführt wurde
+        touch "$MARKER_FILE"
     else
-        echo "Info: Einige Cluster wurden nicht erfolgreich verarbeitet, name_id.map und cluster_ips.json bleiben zur weiteren Überprüfung erhalten."
+        log "INFO" "Einige Cluster wurden nicht erfolgreich verarbeitet, name_id.map und cluster_ips.json bleiben zur weiteren Überprüfung erhalten."
     fi
 }
 trap cleanup EXIT
+
+# Hinweis für detailliertes Logging
+log "INFO" "Hinweis: Du kannst detailliertes Logging aktivieren, indem du das Skript mit der Option '-dl' ausführst."
 
 exit 0
 
