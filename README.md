@@ -8,7 +8,7 @@ Dieses Repository enthält eine Sammlung von Skripten, die dazu dienen, Daten au
 
 ## Voraussetzungen
 
-Bevor die Skripte ausgeführt werden, stellen Sie sicher, dass die folgenden Werkzeuge auf Ihrem System installiert sind:
+Bevor die Skripte ausgeführt werden, stelle sicher, dass die folgenden Werkzeuge auf deinem System installiert sind:
 
 - **Kubernetes CLI (`kubectl`)**: Wird verwendet, um mit Kubernetes-Clustern zu interagieren.
 - **Python 3.x**: Das Python-Skript erfordert Python 3.x.
@@ -29,12 +29,12 @@ cd tc-cluster-crawler
 Das Skript crawl_clusters.sh sammelt Daten aus den in dem Skript angegebenen Kubernetes-Clustern. Es wechselt die Kontexte zu jedem Cluster, ruft die erforderlichen Informationen ab und speichert sie im Verzeichnis info_cache_<DATUM>.
 
 Erster Lauf des Skripts
-Beim ersten Ausführen des Skripts setzen Sie die Umgebungsvariable FORCE_REBUILD auf 1, um die Sammlung neuer Daten aus allen Clustern zu erzwingen:
-
+Beim ersten Ausführen des Skripts setze die Umgebungsvariable FORCE_REBUILD auf 1, um die Sammlung neuer Daten aus allen Clustern zu erzwingen:
 ./crawl_clusters.sh -dl
 
--dl: Aktiviert detailliertes Logging, das ausführlichere Ausgaben für Debugging- und Überwachungszwecke bereitstellt.
-Nachfolgende Ausführungen
+- -dl: Aktiviert detailliertes Logging, das ausführlichere Ausgaben für Debugging- und Überwachungszwecke bereitstellt.
+
+# Nachfolgende Ausführungen
 Bei nachfolgenden Ausführungen verwendet das Skript die zwischengespeicherten Daten, es sei denn, FORCE_REBUILD wird manuell auf 1 gesetzt. Du kannst das Skript ohne zusätzliche Argumente ausführen: ./crawl_clusters.sh
 
 Hinweis: Das Skript schaltet die Variable FORCE_REBUILD automatisch um, je nachdem, ob es zuvor ausgeführt wurde oder nicht. Das Skript erstellt nach einem erfolgreichen Lauf eine Marker-Datei (cluster_crawler_marker), die verwendet wird, um zu bestimmen, ob der Cache beim nächsten Ausführen neu aufgebaut werden soll.
@@ -44,15 +44,13 @@ Hinweis: Das Skript schaltet die Variable FORCE_REBUILD automatisch um, je nachd
 
 
 Nach dem Sammeln der Cluster-Daten führst du das Python-Skript aus, um Markdown-Berichte zu generieren: python3 generate_ingress_reports.py -dl
-
-
-[-dl: Aktiviert detailliertes Logging im Python-Skript.]
+- -dl: Aktiviert detailliertes Logging im Python-Skript.
 
 Dieses Skript verarbeitet die im Verzeichnis info_cache_<DATUM> gespeicherten Daten und generiert Markdown-Dateien, die die Ingress-Informationen für jeden Cluster zusammenfassen. Die Markdown-Dateien werden im Verzeichnis ergebnisse gespeichert und mit Dateinamen versehen, die dem jeweiligen Cluster entsprechen.
 
 
 ### Schritt 4: Die Markdown-Berichte anzeigen
-Nach dem Ausführen des Python-Skripts navigierst du zum Verzeichnis ergebnisse, um die generierten Markdown-Berichte anzuzeigen. Jede Datei ist nach dem Cluster benannt, mit einem Suffix _ingress.md.
+Nach dem Ausführen des Python-Skripts navigierst du zum Verzeichnis 'ergebnisse', um die generierten Markdown-Berichte anzuzeigen. Jede Datei ist nach dem Cluster benannt, mit einem Suffix _ingress.md.
 
 Beispiel:
 
@@ -61,7 +59,7 @@ ergebnisse/
 ├── fttc-pf01_ingress.md
 ...
 
-Fehlersuche
+# Fehlersuche
 - Authentifizierungsprobleme: Stelle sicher, dass du die erforderlichen Berechtigungen und Anmeldedaten hast, um auf die Kubernetes-Cluster zuzugreifen.
 - Force Rebuild: Wenn das Skript keine neuen Daten sammelt, versuche, die Umgebungsvariable FORCE_REBUILD manuell auf 1 zu setzen.
 - Detailliertes Logging: Verwende die Option -dl für detailliertere Ausgaben, die bei der Fehlerbehebung helfen können.
