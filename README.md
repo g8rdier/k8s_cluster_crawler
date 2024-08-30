@@ -11,9 +11,8 @@ Dieses Repository enthält eine Sammlung von Skripten, die dazu dienen, Daten au
 Bevor die Skripte ausgeführt werden, stelle sicher, dass die folgenden Werkzeuge auf deinem System installiert sind:
 
 - **Kubernetes CLI (`kubectl`)**: Wird verwendet, um mit Kubernetes-Clustern zu interagieren.
+- **FI-TS Cloudctl**: Wird verwendet, um mit Kubernetes-Clustern zu interagieren: https://github.com/fi-ts/cloudctl.
 - **Python 3.x**: Das Python-Skript erfordert Python 3.x.
-- **Cloudctl CLI**: Erforderlich, falls Ihre Umgebung den IBM Cloud Kubernetes Service verwendet.
-
 
 ## Nutzungsanleitung
 
@@ -28,6 +27,7 @@ cd tc-cluster-crawler
 Das Skript crawl_clusters.sh sammelt Daten aus den in dem Skript angegebenen Kubernetes-Clustern. Es wechselt die Kontexte zu jedem Cluster, ruft die erforderlichen Informationen ab und speichert sie im Verzeichnis info_cache_<DATUM>.
 
 Erster Lauf des Skripts
+Vor erstem Lauf des Skripts einmal cloudctl login.
 Beim ersten Ausführen des Skripts setze die Umgebungsvariable FORCE_REBUILD auf 1, um die Sammlung neuer Daten aus allen Clustern zu erzwingen:
 ./crawl_clusters.sh -dl
 
