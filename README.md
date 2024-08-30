@@ -21,7 +21,6 @@ Bevor die Skripte ausgeführt werden, stelle sicher, dass die folgenden Werkzeug
 
 Klone das Repository auf deine lokale Maschine:
 
-```bash
 git clone https://git.f-i-ts.de/devops-services/toolchain/develop/tc-cluster-crawler.git
 cd tc-cluster-crawler
 
