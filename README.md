@@ -20,8 +20,10 @@ Bevor die Skripte ausgeführt werden, stelle sicher, dass die folgenden Werkzeug
 
 Klone das Repository auf deine lokale Maschine:
 
+```
 git clone https://git.f-i-ts.de/devops-services/toolchain/develop/tc-cluster-crawler.git
 cd tc-cluster-crawler
+```
 
 ### Schritt 2: Bash-Skript ausführen
 Das Skript crawl_clusters.sh sammelt Daten aus den in dem Skript angegebenen Kubernetes-Clustern. Es wechselt die Kontexte zu jedem Cluster, ruft die erforderlichen Informationen ab und speichert sie im Verzeichnis info_cache_<DATUM>.
