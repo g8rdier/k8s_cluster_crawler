@@ -25,7 +25,7 @@ log() {
     fi
 }
 
-# Skript zum Sammeln von Daten aller "unserer" Cluster
+# Skript zum Sammeln von Daten aller Cluster
 UNSERE_CLUSTER="fttc ftctl"
 
 # Marker-Datei zur Verfolgung, ob das Skript bereits erfolgreich ausgeführt wurde
@@ -178,9 +178,12 @@ while IFS=";" read -r CLSTRNM CLSTRID; do
         debug_crawler_error
         exit 1
     fi
+    
+    # Kubernetes Version fetchen
+    KUBE_VERSION=$(kubectl version --output=json | jq -r '.serverVersion.gitVersion')
 
     # Abrufen und Speichern von Pod-Informationen
-    if ! kubectl get pods -A -o json > "${CLSTR_PODS}"; then
+    if ! kubectl get pods -A -o json | jq --arg k8s_version "$KUBE_VERSION" '.items |= map(. + {kubernetesVersion: $k8s_version})' > "${CLSTR_PODS}"; then
         log "ERROR" "Fehler beim Abrufen der Pods für Cluster '${CLSTRNM}'"
         debug_crawler_error
         exit 1

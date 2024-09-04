@@ -1,0 +1,11 @@
+# Übersicht für Cluster: fttc-ts01 (ingress)
+
+| Namespace          | Name                                               | Hosts                                                                                                                                                 | Adresse       | Ports     |
+|:-------------------|:---------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------|:----------|
+| doorman-test       | doorman                                            | git.lab.f-i-ts.io, git.lab.f-i-ts.io, kas.lab.f-i-ts.io, reg.lab.f-i-ts.io, internal.lab.f-i-ts.io, *.pages.lab.f-i-ts.io, grafana-pf01.lab.f-i-ts.io | 212.34.85.224 | 8000, 443 |
+| headscale-test     | headscale                                          | headscale.fttc-ts01.p72l9s.cluster.fits.cloud                                                                                                         | 212.34.85.224 | 443, 8080 |
+| nextcloud-showcase | nextcloud-ts01-showcase-collabora-collabora-online | nc-office-showcase.fttc-ts01.p72l9s.cluster.fits.cloud                                                                                                | 212.34.85.224 | 9980, 443 |
+| nextcloud-showcase | nextcloud-ts01-showcase-nextcloud                  | nc-showcase.fttc-ts01.p72l9s.cluster.fits.cloud                                                                                                       | 212.34.85.224 | 443, 8080 |
+| nextcloud          | nextcloud-ts01-collabora-collabora-online          | nc-office.fttc-ts01.p72l9s.cluster.fits.cloud                                                                                                         | 212.34.85.224 | 9980, 443 |
+| nextcloud          | nextcloud-ts01-nextcloud                           | nc-test.fttc-ts01.p72l9s.cluster.fits.cloud                                                                                                           | 212.34.85.224 | 443, 8080 |
+| nextcloud          | signaling                                          | nc-signal.fttc-ts01.p72l9s.cluster.fits.cloud                                                                                                         | 212.34.85.224 | 443, 8080 |
