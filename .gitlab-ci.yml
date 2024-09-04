@@ -4,7 +4,6 @@ image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
 
 stages:
   - validate
-  - process
 
 lint:
   stage: validate
