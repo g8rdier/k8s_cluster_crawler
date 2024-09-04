@@ -86,7 +86,7 @@ fi
 
 if [ "${FORCE_REBUILD}" == "1" ]; then
     log "INFO" "Umgebungsvariable 'FORCE_REBUILD' ist auf 1 gesetzt, aktualisiere alle zwischengespeicherten Cluster-Informationen"
-    rm -rf "${INFO_CACHE}/*" > /dev/null 2>&1
+    rm -rf "${INFO_CACHE:?}/*" > /dev/null 2>&1
 else
     log "INFO" "Umgebungsvariable 'FORCE_REBUILD' ist nicht auf 1 gesetzt, benutze zwischengespeicherte Cluster-Informationen"
 fi

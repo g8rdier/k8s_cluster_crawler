@@ -11,6 +11,6 @@ lint:
   variables:
     SHELLCHECK_OPTS: ""
   script:
-    - shellcheck scripts/crawl_clusters.sh
+    - shellcheck scripts/cluster_crawler.sh
 
 ...
