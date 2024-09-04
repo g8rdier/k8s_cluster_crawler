@@ -99,20 +99,20 @@ debug_crawler_error() {
 }
 
 # IP Scraper: Abrufen und Speichern der IP-Adressen aller Cluster
-CLSTR_IPS="${INFO_CACHE}/cluster_ips.json"
-if [ ! -s "${CLSTR_IPS}" ]; then
-    if ! cloudctl ip list -o json > "${CLSTR_IPS}"; then
-        log "ERROR" "Fehler beim Ausführen des Befehls 'cloudctl ip list -o json'"
-        debug_crawler_error
-        exit 1
-    fi
-
-    if [ ! -s "${CLSTR_IPS}" ]; then
-        log "ERROR" "'cloudctl ip list' hat keine Ausgabe in '${CLSTR_IPS}' erzeugt"
-        debug_crawler_error
-        exit 1
-    fi
-fi
+#CLSTR_IPS="${INFO_CACHE}/cluster_ips.json"
+#if [ ! -s "${CLSTR_IPS}" ]; then
+#    if ! cloudctl ip list -o json > "${CLSTR_IPS}"; then
+#        log "ERROR" "Fehler beim Ausführen des Befehls 'cloudctl ip list -o json'"
+#        debug_crawler_error
+#        exit 1
+#    fi
+#
+#    if [ ! -s "${CLSTR_IPS}" ]; then
+#        log "ERROR" "'cloudctl ip list' hat keine Ausgabe in '${CLSTR_IPS}' erzeugt"
+#        debug_crawler_error
+#        exit 1
+#    fi
+#fi
 
 # NAMEID Scraper: Abrufen und Speichern der Name-ID-Zuordnung aller Cluster
 NAMEID_MAP="${INFO_CACHE}/name_id.map"
@@ -139,24 +139,24 @@ if [ ! -s "${NAMEID_MAP}" ]; then
 fi
 
 # Cluster Describer: Abrufen und Speichern detaillierter Informationen für jeden Cluster
-while IFS=";" read -r CLSTRNM CLSTRID; do
-    log "DEBUG" "Beschreibe ${CLSTRNM} mit ${CLSTRID}"
-
-    CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
-    if [ ! -s "${CLSTR_INFO}" ]; then
-        if ! cloudctl cluster describe "${CLSTRID}" -o json > "${CLSTR_INFO}"; then
-            log "ERROR" "Fehler beim Beschreiben des Clusters '${CLSTRNM}' mit ID '${CLSTRID}'"
-            debug_crawler_error
-            exit 1
-        fi
-    fi
-
-    if [ ! -s "${CLSTR_INFO}" ]; then
-        log "ERROR" "Fehler beim Erstellen / Füllen von '${CLSTR_INFO}'"
-        debug_crawler_error
-        exit 1
-    fi
-done < "${NAMEID_MAP}"
+#while IFS=";" read -r CLSTRNM CLSTRID; do
+#    log "DEBUG" "Beschreibe ${CLSTRNM} mit ${CLSTRID}"
+#
+#    CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
+#    if [ ! -s "${CLSTR_INFO}" ]; then
+#        if ! cloudctl cluster describe "${CLSTRID}" -o json > "${CLSTR_INFO}"; then
+#            log "ERROR" "Fehler beim Beschreiben des Clusters '${CLSTRNM}' mit ID '${CLSTRID}'"
+#            debug_crawler_error
+#            exit 1
+#        fi
+#    fi
+#
+#    if [ ! -s "${CLSTR_INFO}" ]; then
+#        log "ERROR" "Fehler beim Erstellen / Füllen von '${CLSTR_INFO}'"
+#        debug_crawler_error
+#        exit 1
+#    fi
+#done < "${NAMEID_MAP}"
 
 # Kubernetes Data Collector: Abrufen und Speichern von Kubernetes-Informationen (Pods und Ingress) für jeden Cluster
 while IFS=";" read -r CLSTRNM CLSTRID; do
