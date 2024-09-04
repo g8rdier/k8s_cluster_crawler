@@ -198,29 +198,29 @@ while IFS=";" read -r CLSTRNM CLSTRID; do
 done < "${NAMEID_MAP}"
 
 # Doppelte Überprüfung, ob alle Cluster aus name_id.map verarbeitet wurden
-ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=true
+# ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=true
 
-while IFS=";" read -r CLSTRNM CLSTRID; do
-    CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
-    
-    if [ ! -s "${CLSTR_INFO}" ]; then
-        log "ERROR" "Cluster '${CLSTRNM}' wurde nicht korrekt verarbeitet"
-        debug_crawler_error
-        ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=false
-    fi
-done < "${NAMEID_MAP}"
+# while IFS=";" read -r CLSTRNM CLSTRID; do
+#    CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
+#    
+#    if [ ! -s "${CLSTR_INFO}" ]; then
+#        log "ERROR" "Cluster '${CLSTRNM}' wurde nicht korrekt verarbeitet"
+#        debug_crawler_error
+#        ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=false
+#    fi
+#done < "${NAMEID_MAP}"
 
 # Cleanup-Funktion für das Entfernen der Dateien, wenn alle Cluster erfolgreich verarbeitet wurden
-cleanup() {
-    if [ $ALL_CLUSTERS_PROCESSED_SUCCESSFULLY == true ]; then
-        log "INFO" "Alle Cluster wurden erfolgreich verarbeitet, name_id.map und cluster_ips.json werden entfernt"
-        rm -f "${NAMEID_MAP}"
-        rm -f "${CLSTR_IPS}"
+#cleanup() {
+#    if [ $ALL_CLUSTERS_PROCESSED_SUCCESSFULLY == true ]; then
+#        log "INFO" "Alle Cluster wurden erfolgreich verarbeitet, name_id.map und cluster_ips.json werden entfernt"
+#        rm -f "${NAMEID_MAP}"
+#        rm -f "${CLSTR_IPS}"
         # Marker-Datei erstellen, um anzuzeigen, dass das Skript erfolgreich ausgeführt wurde
-        touch "$MARKER_FILE"
-    else
-        log "INFO" "Einige Cluster wurden nicht erfolgreich verarbeitet, name_id.map und cluster_ips.json bleiben zur weiteren Überprüfung erhalten."
-    fi
+#        touch "$MARKER_FILE"
+#    else
+#        log "INFO" "Einige Cluster wurden nicht erfolgreich verarbeitet, name_id.map und cluster_ips.json bleiben zur weiteren Überprüfung erhalten."
+#    fi
 }
 trap cleanup EXIT
 
