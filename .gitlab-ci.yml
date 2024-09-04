@@ -13,11 +13,3 @@ lint:
     SHELLCHECK_OPTS: ""
   script:
     - shellcheck scripts/cluster_crawler.sh
-
-run_scripts:
-  stage: process
-  script:
-    - bash scripts/cluster_crawler.sh
-    - apt-get update && apt-get install -y python3 python3-pip
-    - pip3 install -r requirements.txt 
-    - python3 scripts/parser.py
