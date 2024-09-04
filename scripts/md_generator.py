@@ -11,8 +11,6 @@ EXPECTED_CLUSTERS = {"fttc", "ftctl"}
 def configure_logging(detailed):
     """
     Konfiguriert das Logging-Level basierend auf der Benutzerauswahl.
-    
-    :param detailed: Boolesche Option, um detailliertes Logging zu aktivieren oder zu deaktivieren
     """
     if detailed:
         logging.basicConfig(level=logging.INFO)
@@ -22,9 +20,6 @@ def configure_logging(detailed):
 def read_json_file(file_path):
     """
     Liest eine JSON-Datei und gibt die Daten als Python-Datenstruktur zurück.
-    
-    :param file_path: Pfad zur JSON-Datei
-    :return: Inhalt der JSON-Datei als Python-Datenstruktur
     """
     with open(file_path, 'r', encoding='utf-8') as file:
         return json.load(file)
@@ -32,9 +27,6 @@ def read_json_file(file_path):
 def extract_ingress_info(json_data):
     """
     Extrahiert relevante Ingress-Informationen aus den gegebenen JSON-Daten und führt Validierungsprüfungen durch.
-    
-    :param json_data: JSON-Daten, die Ingress-Informationen enthalten
-    :return: Liste mit extrahierten Ingress-Informationen
     """
     ingress_info = []
     for item in json_data['items']:
@@ -43,70 +35,69 @@ def extract_ingress_info(json_data):
         
         logging.info(f"Extrahiere Daten für Namespace: {namespace}, Name: {name}")
         
-        # Extrahiert die Hosts, wobei fehlende 'host'-Schlüssel als 'N/A' gekennzeichnet werden
         hosts = ", ".join(rule.get('host', 'N/A') for rule in item.get('spec', {}).get('rules', []))
-        
         if 'N/A' in hosts or not hosts:
             logging.warning(f"Warnung: Fehlende Hosts für Ingress '{name}' im Namespace '{namespace}'.")
-        
-        # Extrahiert die IP-Adresse der LoadBalancer, falls vorhanden, sonst 'N/A'
+
         address = ", ".join(lb.get('ip', 'N/A') for lb in item.get('status', {}).get('loadBalancer', {}).get('ingress', []))
-        
         if not address:
             logging.warning(f"Warnung: Fehlende IP-Adresse für Ingress '{name}' im Namespace '{namespace}'.")
-        
-        # Bestimmt die Ports, die durch diesen Ingress genutzt werden
+
         ports = set()
         if 'tls' in item.get('spec', {}):
-            ports.add("443")  # Standardmäßig Port 443 hinzufügen, wenn TLS verwendet wird
+            ports.add("443")
         for rule in item.get('spec', {}).get('rules', []):
             for path in rule.get('http', {}).get('paths', []):
                 service_port = path.get('backend', {}).get('service', {}).get('port', {}).get('number', '80')
                 ports.add(str(service_port))
         
         ports_str = ", ".join(ports) if ports else "80"
-        
         if not ports_str:
             logging.warning(f"Warnung: Keine Ports für Ingress '{name}' im Namespace '{namespace}' gefunden.")
         
         ingress_info.append([namespace, name, hosts, address, ports_str])
     return ingress_info
 
-def generate_markdown_table(ingress_info, cluster_name, output_dir):
+def extract_pod_info(json_data):
     """
-    Generiert eine Markdown-Datei mit einer Tabelle, die die extrahierten Ingress-Informationen darstellt.
+    Extrahiert relevante Pod-Informationen aus den gegebenen JSON-Daten.
+    """
+    pod_info = []
+    for item in json_data['items']:
+        namespace = item['metadata']['namespace']
+        name = item['metadata']['name']
+        node_name = item['spec'].get('nodeName', 'N/A')
+        containers = item['spec'].get('containers', [])
+        images = ", ".join(container.get('image', 'N/A') for container in containers)
+        
+        logging.info(f"Extrahiere Pod-Daten für Namespace: {namespace}, Name: {name}, Node: {node_name}, Image(s): {images}")
+        
+        pod_info.append([namespace, name, images, node_name])
+    return pod_info
+
+def generate_markdown_table(data, headers, cluster_name, output_dir, suffix):
+    """
+    Generiert eine Markdown-Datei mit einer Tabelle, die die extrahierten Informationen darstellt.
     
-    :param ingress_info: Liste mit den extrahierten Ingress-Informationen
+    :param data: Liste mit den extrahierten Informationen
+    :param headers: Tabellen-Header
     :param cluster_name: Name des Clusters, für den die Tabelle generiert wird
     :param output_dir: Verzeichnis, in dem die Markdown-Datei gespeichert wird
+    :param suffix: Suffix für den Dateinamen ("_ingress" oder "_pods")
     """
-    headers = ["Namespace", "Name", "Hosts", "Adresse", "Ports"]
-    table = []
+    table = tabulate(data, headers, tablefmt="pipe")
+    markdown_content = f"# Übersicht für Cluster: {cluster_name} ({suffix.strip('_')})\n\n{table}\n"
     
-    for entry in ingress_info:
-        if 'N/A' in entry[2]:
-            entry[2] += " (Warnung: Fehlende Hosts)"
-        if 'N/A' in entry[3]:
-            entry[3] += " (Warnung: Fehlende Adresse)"
-        
-        table.append(entry)
-    
-    markdown_table = tabulate(table, headers, tablefmt="pipe")
-    markdown_content = f"# Ingress-Übersicht für Cluster: {cluster_name}\n\n{markdown_table}\n"
-    
-    output_file = os.path.join(output_dir, f"{cluster_name}_ingress.md")
+    output_file = os.path.join(output_dir, f"{cluster_name}{suffix}.md")
     with open(output_file, 'w', encoding='utf-8') as file:
         file.write(markdown_content)
     
-    print(f"Markdown-Datei für Cluster '{cluster_name}' erstellt.")
+    print(f"Markdown-Datei für Cluster '{cluster_name}' ({suffix.strip('_')}) erstellt.")
 
 def process_all_clusters(info_cache_dir, results_dir):
     """
-    Verarbeitet alle Cluster im angegebenen Cache-Verzeichnis, extrahiert die Ingress-Informationen 
-    und erstellt Markdown-Dateien für jeden Cluster. Führt zudem eine Überprüfung durch, ob alle erwarteten Cluster verarbeitet wurden.
-    
-    :param info_cache_dir: Verzeichnis, das die Cache-Dateien für die Cluster enthält
-    :param results_dir: Verzeichnis, in dem die Ergebnisse (Markdown-Dateien) gespeichert werden
+    Verarbeitet alle Cluster im angegebenen Cache-Verzeichnis, extrahiert die Ingress- und Pod-Informationen 
+    und erstellt separate Markdown-Dateien für Ingress und Pods für jeden Cluster.
     """
     if not os.path.exists(results_dir):
         os.makedirs(results_dir)
@@ -117,17 +108,25 @@ def process_all_clusters(info_cache_dir, results_dir):
     for filename in os.listdir(info_cache_dir):
         if filename.endswith("_ingress.json"):
             cluster_name = filename.split("_")[0]
-            file_path = os.path.join(info_cache_dir, filename)
+            ingress_file_path = os.path.join(info_cache_dir, filename)
+            pod_file_path = os.path.join(info_cache_dir, filename.replace("_ingress", "_pods"))
+            
             cluster_prefix = cluster_name.split('-')[0]
             processed_clusters.add(cluster_prefix)
-            json_data = read_json_file(file_path)
-            ingress_info = extract_ingress_info(json_data)
+            
+            ingress_json_data = read_json_file(ingress_file_path)
+            pod_json_data = read_json_file(pod_file_path) if os.path.exists(pod_file_path) else None
+            
+            ingress_info = extract_ingress_info(ingress_json_data)
+            pod_info = extract_pod_info(pod_json_data) if pod_json_data else []
             
             for info in ingress_info:
                 if 'N/A' in info[2] or 'N/A' in info[3]:
                     issues.append((cluster_name, info))
             
-            generate_markdown_table(ingress_info, cluster_name, results_dir)
+            generate_markdown_table(ingress_info, ["Namespace", "Name", "Hosts", "Adresse", "Ports"], cluster_name, results_dir, "_ingress")
+            if pod_info:
+                generate_markdown_table(pod_info, ["Namespace", "Pod Name", "Image", "Node Name"], cluster_name, results_dir, "_pods")
     
     missed_clusters = EXPECTED_CLUSTERS - processed_clusters
     if missed_clusters:
@@ -142,11 +141,11 @@ def process_all_clusters(info_cache_dir, results_dir):
     else:
         print("Keine Probleme in den Ingresses gefunden.")
 
-    print("\nHinweis: Du kannst detailliertes Logging aktivieren, indem du das Skript mit der Option '--dl' ausführst.")
+    print("\nHinweis: Du kannst detailliertes Logging aktivieren, indem du das Skript mit der Option '-dl' ausführst.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Verarbeitet Kubernetes Ingress-Daten und generiert Markdown-Berichte.")
-    parser.add_argument('--dl', action='store_true', help="Aktiviert detailliertes Logging.")
+    parser = argparse.ArgumentParser(description="Verarbeitet Kubernetes Ingress- und Pod-Daten und generiert separate Markdown-Berichte.")
+    parser.add_argument('-dl', action='store_true', help="Aktiviert detailliertes Logging.")
     args = parser.parse_args()
 
     configure_logging(args.dl)
