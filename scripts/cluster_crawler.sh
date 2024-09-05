@@ -98,22 +98,6 @@ debug_crawler_error() {
     ls -al "${INFO_CACHE}"
 }
 
-# IP Scraper: Abrufen und Speichern der IP-Adressen aller Cluster
-#CLSTR_IPS="${INFO_CACHE}/cluster_ips.json"
-#if [ ! -s "${CLSTR_IPS}" ]; then
-#    if ! cloudctl ip list -o json > "${CLSTR_IPS}"; then
-#        log "ERROR" "Fehler beim Ausführen des Befehls 'cloudctl ip list -o json'"
-#        debug_crawler_error
-#        exit 1
-#    fi
-#
-#    if [ ! -s "${CLSTR_IPS}" ]; then
-#        log "ERROR" "'cloudctl ip list' hat keine Ausgabe in '${CLSTR_IPS}' erzeugt"
-#        debug_crawler_error
-#        exit 1
-#    fi
-#fi
-
 # NAMEID Scraper: Abrufen und Speichern der Name-ID-Zuordnung aller Cluster
 NAMEID_MAP="${INFO_CACHE}/name_id.map"
 if [ ! -s "${NAMEID_MAP}" ]; then
@@ -137,26 +121,6 @@ if [ ! -s "${NAMEID_MAP}" ]; then
         exit 1
     fi
 fi
-
-# Cluster Describer: Abrufen und Speichern detaillierter Informationen für jeden Cluster
-#while IFS=";" read -r CLSTRNM CLSTRID; do
-#    log "DEBUG" "Beschreibe ${CLSTRNM} mit ${CLSTRID}"
-#
-#    CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
-#    if [ ! -s "${CLSTR_INFO}" ]; then
-#        if ! cloudctl cluster describe "${CLSTRID}" -o json > "${CLSTR_INFO}"; then
-#            log "ERROR" "Fehler beim Beschreiben des Clusters '${CLSTRNM}' mit ID '${CLSTRID}'"
-#            debug_crawler_error
-#            exit 1
-#        fi
-#    fi
-#
-#    if [ ! -s "${CLSTR_INFO}" ]; then
-#        log "ERROR" "Fehler beim Erstellen / Füllen von '${CLSTR_INFO}'"
-#        debug_crawler_error
-#        exit 1
-#    fi
-#done < "${NAMEID_MAP}"
 
 # Kubernetes Data Collector: Abrufen und Speichern von Kubernetes-Informationen (Pods und Ingress) für jeden Cluster
 while IFS=";" read -r CLSTRNM CLSTRID; do
@@ -198,29 +162,28 @@ while IFS=";" read -r CLSTRNM CLSTRID; do
 done < "${NAMEID_MAP}"
 
 # Doppelte Überprüfung, ob alle Cluster aus name_id.map verarbeitet wurden
-# ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=true
+ ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=true
 
-# while IFS=";" read -r CLSTRNM CLSTRID; do
-#    CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
-#    
-#    if [ ! -s "${CLSTR_INFO}" ]; then
-#        log "ERROR" "Cluster '${CLSTRNM}' wurde nicht korrekt verarbeitet"
-#        debug_crawler_error
-#        ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=false
-#    fi
-#done < "${NAMEID_MAP}"
+ while IFS=";" read -r CLSTRNM CLSTRID; do
+    CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
+    
+    if [ ! -s "${CLSTR_INFO}" ]; then
+        log "ERROR" "Cluster '${CLSTRNM}' wurde nicht korrekt verarbeitet"
+        debug_crawler_error
+        ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=false
+    fi
+done < "${NAMEID_MAP}"
 
 # Cleanup-Funktion für das Entfernen der Dateien, wenn alle Cluster erfolgreich verarbeitet wurden
 #cleanup() {
-#    if [ $ALL_CLUSTERS_PROCESSED_SUCCESSFULLY == true ]; then
-#        log "INFO" "Alle Cluster wurden erfolgreich verarbeitet, name_id.map und cluster_ips.json werden entfernt"
-#        rm -f "${NAMEID_MAP}"
-#        rm -f "${CLSTR_IPS}"
-        # Marker-Datei erstellen, um anzuzeigen, dass das Skript erfolgreich ausgeführt wurde
-#        touch "$MARKER_FILE"
-#    else
-#        log "INFO" "Einige Cluster wurden nicht erfolgreich verarbeitet, name_id.map und cluster_ips.json bleiben zur weiteren Überprüfung erhalten."
-#    fi
+    if [ $ALL_CLUSTERS_PROCESSED_SUCCESSFULLY == true ]; then
+        log "INFO" "Alle Cluster wurden erfolgreich verarbeitet, name_id.map wird entfernt"
+        rm -f "${NAMEID_MAP}"
+         # Marker-Datei erstellen, um anzuzeigen, dass das Skript erfolgreich ausgeführt wurde
+         touch "$MARKER_FILE"
+    else
+        log "INFO" "Einige Cluster wurden nicht erfolgreich verarbeitet, name_id.map und cluster_ips.json bleiben zur weiteren Überprüfung erhalten."
+    fi 
 }
 trap cleanup EXIT
 
