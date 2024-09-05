@@ -175,7 +175,7 @@ done < "${NAMEID_MAP}"
 done < "${NAMEID_MAP}"
 
 # Cleanup-Funktion für das Entfernen der Dateien, wenn alle Cluster erfolgreich verarbeitet wurden
-#cleanup() {
+cleanup() {
     if [ $ALL_CLUSTERS_PROCESSED_SUCCESSFULLY == true ]; then
         log "INFO" "Alle Cluster wurden erfolgreich verarbeitet, name_id.map wird entfernt"
         rm -f "${NAMEID_MAP}"
