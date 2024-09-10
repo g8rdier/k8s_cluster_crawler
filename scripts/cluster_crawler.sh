@@ -54,13 +54,6 @@ create_directory() {
     return 0
 }
 
-# Funktion zum Erstellen eines leeren Verzeichnisses (falls vorhanden, wird es entfernt, dann neu erstellt)
-create_empty_directory() {
-    locDir="${1}"
-    rm -rf "${locDir}" > /dev/null 2>&1
-    create_directory "${locDir}"  # Corrected function call
-}
-
 # Funktion zum Setzen des Kubernetes-Kontexts für einen gegebenen Cluster
 set_kube_context() {
     if kubectl config use-context "$1"; then  # Fixed syntax here by removing unnecessary quotes
@@ -71,8 +64,6 @@ set_kube_context() {
         return 1
     fi
 }
-
-# Ab hier beginnt das Hauptskript
 
 # temporäres Verzeichnis
 DAYSTAMP="$(date +"%Y%m%d")"
@@ -99,27 +90,14 @@ debug_crawler_error() {
 }
 
 # NAMEID Scraper: Abrufen und Speichern der Name-ID-Zuordnung aller Cluster
-NAMEID_MAP="${INFO_CACHE}/name_id.map"
-if [ ! -s "${NAMEID_MAP}" ]; then
-    : > "${NAMEID_MAP}"  # Datei erstellen oder leeren
+NAMEID_MAP="/home/gregorc8/tc-cluster-crawler/scripts/docs/name_id.map"
 
-    log "DEBUG" "Unsere Cluster sind '${UNSERE_CLUSTER}'"
-    for tnt in ${UNSERE_CLUSTER}; do
-        log "DEBUG" "Tenant ist ${tnt}"
-        # Cluster für jeden Tenant auflisten und zur Map hinzufügen
-        if ! cloudctl cluster list --tenant "${tnt}" | grep -v "NAME" | awk '{ print $4";"$1 }' >> "${NAMEID_MAP}"; then
-            log "ERROR" "Fehler beim Auflisten der Cluster für Tenant '${tnt}'"
-            debug_crawler_error
-            exit 1
-        fi
-    done
-
-    # Letzte Überprüfung, ob die name_id.map Datei gefüllt ist
-    if [ ! -s "${NAMEID_MAP}" ]; then
-        log "ERROR" "Fehler beim Erstellen / Füllen von '${NAMEID_MAP}'"
-        debug_crawler_error
-        exit 1
-    fi
+if [ -f "${NAMEID_MAP}" ]; then
+    log "INFO" "Statische name_id.map Datei gefunden. Verwende die Datei für die Cluster-Informationen."
+else
+    log "ERROR" "Statische name_id.map Datei nicht gefunden! Bitte überprüfen."
+    debug_crawler_error
+    exit 1
 fi
 
 # Kubernetes Data Collector: Abrufen und Speichern von Kubernetes-Informationen (Pods und Ingress) für jeden Cluster
@@ -130,30 +108,25 @@ while IFS=";" read -r CLSTRNM CLSTRID; do
     CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
     CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.json"
 
-    # Überprüfen, ob der kube context existiert
     if ! kubectl config get-contexts "${CLSTRNM}" &> /dev/null; then
         log "WARNING" "Kein kube Kontext für Cluster '${CLSTRNM}' gefunden, überspringe..."
         continue
     fi
 
-    # Zum entsprechenden kube Kontext für den Cluster wechseln
     if ! set_kube_context "${CLSTRNM}"; then
         log "ERROR" "Fehler beim Setzen des kube Kontextes für Cluster '${CLSTRNM}'"
         debug_crawler_error
         exit 1
     fi
-    
-    # Kubernetes Version fetchen
+
     KUBE_VERSION=$(kubectl version --output=json | jq -r '.serverVersion.gitVersion')
 
-    # Abrufen und Speichern von Pod-Informationen
     if ! kubectl get pods -A -o json | jq --arg k8s_version "$KUBE_VERSION" '.items |= map(. + {kubernetesVersion: $k8s_version})' > "${CLSTR_PODS}"; then
         log "ERROR" "Fehler beim Abrufen der Pods für Cluster '${CLSTRNM}'"
         debug_crawler_error
         exit 1
     fi
 
-    # Abrufen und Speichern von Ingress-Informationen
     if ! kubectl get ingress -A -o json > "${CLSTR_INGRESS}"; then
         log "ERROR" "Fehler beim Abrufen der Ingress für Cluster '${CLSTRNM}'"
         debug_crawler_error
@@ -161,34 +134,27 @@ while IFS=";" read -r CLSTRNM CLSTRID; do
     fi
 done < "${NAMEID_MAP}"
 
-# Doppelte Überprüfung, ob alle Cluster aus name_id.map verarbeitet wurden
- ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=true
+# Pfade zum Git-Repository festlegen
+REPO_DIR="/path/to/your/repo"
+INGRESS_PATH="${REPO_DIR}/boms/k8s/ingress"
+PODS_PATH="${REPO_DIR}/boms/k8s/pods"
 
- while IFS=";" read -r CLSTRNM CLSTRID; do
-    CLSTR_INFO="${INFO_CACHE}/${CLSTRNM}_describe.json"
-    
-    if [ ! -s "${CLSTR_INFO}" ]; then
-        log "ERROR" "Cluster '${CLSTRNM}' wurde nicht korrekt verarbeitet"
-        debug_crawler_error
-        ALL_CLUSTERS_PROCESSED_SUCCESSFULLY=false
-    fi
-done < "${NAMEID_MAP}"
+# Erstellen der Zielverzeichnisse im Repository
+create_directory "${INGRESS_PATH}"
+create_directory "${PODS_PATH}"
 
-# Cleanup-Funktion für das Entfernen der Dateien, wenn alle Cluster erfolgreich verarbeitet wurden
-cleanup() {
-    if [ $ALL_CLUSTERS_PROCESSED_SUCCESSFULLY == true ]; then
-        log "INFO" "Alle Cluster wurden erfolgreich verarbeitet, name_id.map wird entfernt"
-        rm -f "${NAMEID_MAP}"
-         # Marker-Datei erstellen, um anzuzeigen, dass das Skript erfolgreich ausgeführt wurde
-         touch "$MARKER_FILE"
-    else
-        log "INFO" "Einige Cluster wurden nicht erfolgreich verarbeitet, name_id.map und cluster_ips.json bleiben zur weiteren Überprüfung erhalten."
-    fi 
-}
-trap cleanup EXIT
+# Kopiere die neuen Daten ins Repository-Verzeichnis
+cp -r "${INFO_CACHE}/*_ingress.json" "${INGRESS_PATH}/"
+cp -r "${INFO_CACHE}/*_pods.json" "${PODS_PATH}/"
 
-# Hinweis für detailliertes Logging
-log "INFO" "Hinweis: Du kannst detailliertes Logging aktivieren, indem du das Skript mit der Option '-dl' ausführst."
+# Git-Token und Repository konfigurieren
+GIT_USER="gitlab+deploy-token-<ID>"
+GIT_TOKEN="${PUSH_BOM_PAGES}"  # Env-Variable für den Token
+GIT_REPO_URL="https://$GIT_USER:$GIT_TOKEN@gitlab.com/devops-services/toolchain/docs.git"
 
-exit 0
+# Automatischer Commit und Push
+cd "${REPO_DIR}"
+git add .
+git commit -m "Automatisches Update der Cluster-Daten am $(date)"
+git push "${GIT_REPO_URL}" main
 
