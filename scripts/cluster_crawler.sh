@@ -90,7 +90,7 @@ debug_crawler_error() {
 }
 
 # NAMEID Scraper: Abrufen und Speichern der Name-ID-Zuordnung aller Cluster
-NAMEID_MAP="/home/gregorc8/tc-cluster-crawler/scripts/docs/name_id.map"
+NAMEID_MAP="scripts/docs/name_id.map"
 
 if [ -f "${NAMEID_MAP}" ]; then
     log "INFO" "Statische name_id.map Datei gefunden. Verwende die Datei für die Cluster-Informationen."
