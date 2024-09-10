@@ -20,32 +20,21 @@ collect_data:
   script:
     - chmod +x scripts/cluster_crawler.sh  # Stellt sicher, dass das Skript ausführbar ist
     - ./scripts/cluster_crawler.sh  # Hier wird das Skript zur Datensammlung ausgeführt
-  only:
-    - test-ci-changes  # Läuft nur auf deiner Test-Branch
-    - schedules  # Läuft bei geplanten Ausführungen
 
 # Schritt 2: Daten in das Docs-Repository deployen
 deploy_data:
   stage: deploy
   script:
-    # Git-Konfiguration mit CI-Anmeldeinformationen
     - git config --global user.name "GitLab CI"
     - git config --global user.email "ci@example.com"
 
-    # Verwenden des Deploy Tokens aus den CI/CD-Variablen für HTTPS-Authentifizierung
     - git remote set-url origin "https://${PUSH_BOM_PAGES}@gitlab.com/devops-services/toolchain/docs.git"
 
-    # Kopiere die Dateien aus dem Output-Verzeichnis des Skripts in die entsprechenden Pfade des Docs-Repos
     - mkdir -p boms/k8s/ingress
     - mkdir -p boms/k8s/pods
     - cp -r info_cache_*/ingress.json boms/k8s/ingress/
     - cp -r info_cache_*/pods.json boms/k8s/pods/
 
-    # Füge die Änderungen zu Git hinzu, erstelle einen Commit und pushe die Änderungen in das Docs-Repo
     - git add boms/k8s/ingress boms/k8s/pods
     - git commit -m "Automatisches Update der Cluster-Daten am $(date)"
-    - git push origin main  # Passe den Branch bei Bedarf an
-
-  only:
-    - test-ci-changes  # Läuft nur auf deiner Test-Branch
-    - schedules  # Läuft bei geplanten Ausführungen
+    - git push origin main
