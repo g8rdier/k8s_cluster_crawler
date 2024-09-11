@@ -18,6 +18,7 @@ lint:
 collect_data:
   stage: build
   script:
+    - mkdir -p ~/.kube #.kube Verzeichnis
     - echo "$KUBE_CONFIG_DATA" | base64 -d > ~/.kube/config  # Kubernetes-Konfigurationsdatei aus den CI-Variablen laden
     - chmod 600 ~/.kube/config  # Berechtigungen für die Kubernetes-Konfigurationsdatei setzen
     - kubectl config view  # Überprüfen, ob die Kubernetes-Konfigurationsdatei korrekt ist
