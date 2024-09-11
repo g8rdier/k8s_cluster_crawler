@@ -26,6 +26,7 @@ log() {
 }
 
 # Skript zum Sammeln von Daten aller Cluster
+# shellcheck disable=SC2034
 UNSERE_CLUSTER="fttc ftctl"
 
 # Marker-Datei zur Verfolgung, ob das Skript bereits erfolgreich ausgeführt wurde
