@@ -134,7 +134,7 @@ done < "${NAMEID_MAP}"
 
 # Git-Token und Repository konfigurieren
 GIT_USER="gitlab+deploy-token-<ID>"
-GIT_TOKEN="${read&writer}"  # Env-Variable für den Token
+GIT_TOKEN="${rnwer}"  # Env-Variable für den Token
 GIT_REPO_URL="https://"rnwer":${PUSHER}@gitlab.com/devops-services/toolchain/docs.git"
 
 
