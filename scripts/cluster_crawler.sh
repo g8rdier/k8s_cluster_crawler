@@ -38,9 +38,6 @@ else
     FORCE_REBUILD=1
 fi
 
-# Erklärung: Wenn FORCE_REBUILD auf 1 gesetzt ist, werden alle zwischengespeicherten Cluster-Informationen aktualisiert.
-# Wenn es auf 0 gesetzt ist oder nicht definiert wurde, werden die vorhandenen Cache-Daten verwendet.
-
 # Funktion zum Erstellen eines Verzeichnisses, falls es nicht existiert
 create_directory() {
     locDir="${1}"
@@ -56,7 +53,7 @@ create_directory() {
 
 # Funktion zum Setzen des Kubernetes-Kontexts für einen gegebenen Cluster
 set_kube_context() {
-    if kubectl config use-context "$1"; then  # Fixed syntax here by removing unnecessary quotes
+    if kubectl config use-context "$1"; then
         log "INFO" "Erfolgreich zu Kontext ${1} gewechselt"
         return 0
     else
@@ -101,7 +98,7 @@ else
 fi
 
 # Kubernetes Data Collector: Abrufen und Speichern von Kubernetes-Informationen (Pods und Ingress) für jeden Cluster
-while IFS=";" read -r CLSTRNM CLSTRID; do
+while IFS=";" read -r CLSTRNM _CLSTRID; do
     log "DEBUG" "Hole kubectl Cluster-Inhalte für ${CLSTRNM}"
 
     # Dateipfade für das Speichern von Clusterinformationen definieren
@@ -134,8 +131,18 @@ while IFS=";" read -r CLSTRNM CLSTRID; do
     fi
 done < "${NAMEID_MAP}"
 
-# Pfade zum Git-Repository festlegen
-REPO_DIR="/path/to/your/repo"
+# Git-Token und Repository konfigurieren
+GIT_USER="gitlab+deploy-token-<ID>"
+GIT_TOKEN="${PUSH_BOM_PAGES}"  # Env-Variable für den Token
+GIT_REPO_URL="https://$GIT_USER:$GIT_TOKEN@gitlab.com/devops-services/toolchain/docs.git"
+
+# Klonen des Repositories in ein temporäres Verzeichnis
+REPO_DIR="/tmp/docs-repo"
+if [ ! -d "${REPO_DIR}" ]; then
+    git clone "${GIT_REPO_URL}" "${REPO_DIR}"
+fi
+
+# Pfade zum Repository festlegen
 INGRESS_PATH="${REPO_DIR}/boms/k8s/ingress"
 PODS_PATH="${REPO_DIR}/boms/k8s/pods"
 
@@ -147,14 +154,8 @@ create_directory "${PODS_PATH}"
 cp -r "${INFO_CACHE}/*_ingress.json" "${INGRESS_PATH}/"
 cp -r "${INFO_CACHE}/*_pods.json" "${PODS_PATH}/"
 
-# Git-Token und Repository konfigurieren
-GIT_USER="gitlab+deploy-token-<ID>"
-GIT_TOKEN="${PUSH_BOM_PAGES}"  # Env-Variable für den Token
-GIT_REPO_URL="https://$GIT_USER:$GIT_TOKEN@gitlab.com/devops-services/toolchain/docs.git"
-
 # Automatischer Commit und Push
-cd "${REPO_DIR}"
+cd "${REPO_DIR}" || exit
 git add .
 git commit -m "Automatisches Update der Cluster-Daten am $(date)"
 git push "${GIT_REPO_URL}" main
-
