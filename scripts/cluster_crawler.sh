@@ -134,8 +134,8 @@ done < "${NAMEID_MAP}"
 
 # Git-Token und Repository konfigurieren
 GIT_USER="gitlab+deploy-token-<ID>"
-GIT_TOKEN="${PUSH_BOM_PAGES}"  # Env-Variable für den Token
-GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@gitlab.com/devops-services/toolchain/docs.git"
+GIT_TOKEN="${read&writer}"  # Env-Variable für den Token
+GIT_REPO_URL="https://"rnwer":${PUSHER}@gitlab.com/devops-services/toolchain/docs.git"
 
 
 # Klonen des Repositories in ein temporäres Verzeichnis
