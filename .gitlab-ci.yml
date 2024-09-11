@@ -18,11 +18,17 @@ lint:
 collect_data:
   stage: build
   script:
-    # Manuelle Installation kubectl
+    # kubectl installieren
     - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     - chmod +x kubectl
     - mv kubectl /usr/local/bin/kubectl
     - kubectl version --client  
+
+    # jq installieren
+    - curl -L -o jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+    - chmod +x ./jq
+    - mv jq /usr/local/bin/jq
+    - jq --version 
 
     - mkdir -p ~/.kube #.kube Verzeichnis
     - echo "$KUBE_CONFIG_DATA" | base64 -d > ~/.kube/config  # Kubernetes-Konfigurationsdatei aus den CI-Variablen laden
