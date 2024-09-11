@@ -18,7 +18,12 @@ lint:
 collect_data:
   stage: build
   script:
-    - - apk add --no-cache kubectl  # Install kubectl if using alpine or change based on the base image
+    # Manuelle Installation kubectl
+    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - chmod +x kubectl
+    - mv kubectl /usr/local/bin/kubectl
+    - kubectl version --client  
+
     - mkdir -p ~/.kube #.kube Verzeichnis
     - echo "$KUBE_CONFIG_DATA" | base64 -d > ~/.kube/config  # Kubernetes-Konfigurationsdatei aus den CI-Variablen laden
     - chmod 600 ~/.kube/config  # Berechtigungen für die Kubernetes-Konfigurationsdatei setzen
