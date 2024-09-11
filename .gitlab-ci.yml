@@ -23,8 +23,6 @@ collect_data:
     - kubectl config view  # Überprüfen, ob die Kubernetes-Konfigurationsdatei korrekt ist
     - chmod +x scripts/cluster_crawler.sh  # Skript ausführbar machen
     - ./scripts/cluster_crawler.sh  # Datensammelskript ausführen
-  only:
-    - schedules  # Dieser Job wird nur über geplante Ausführungen getriggert, kann bei Bedarf angepasst werden
 
 # Schritt 2: Daten in das Docs-Repository deployen
 deploy_data:
@@ -47,6 +45,3 @@ deploy_data:
     - git add boms/k8s/ingress boms/k8s/pods
     - git commit -m "Automatisches Update der Cluster-Daten am $(date)"
     - git push origin main  # Passe den Branch bei Bedarf an
-
-  only:
-    - schedules  # Dieser Job wird nur bei geplanten Ausführungen getriggert, kann bei Bedarf angepasst werden
