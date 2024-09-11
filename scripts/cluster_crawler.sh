@@ -133,9 +133,9 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 done < "${NAMEID_MAP}"
 
 # Git-Token und Repository konfigurieren
-GIT_USER="gitlab+deploy-token-90"
-GIT_TOKEN="${PUSH_BOM_PAGES}"  # Env-Variable für den Token
-GIT_REPO_URL="https://"rnwer":${PUSH_BOM_PAGES}@gitlab.com/devops-services/toolchain/docs.git"
+GIT_USER="${GIT_USER}"
+GIT_TOKEN="${GIT_TOKEN}"  
+GIT_REPO_URL="https://"rnwer":${GIT_TOKEN}@gitlab.com/devops-services/toolchain/docs.git"
 
 
 # Klonen des Repositories in ein temporäres Verzeichnis
