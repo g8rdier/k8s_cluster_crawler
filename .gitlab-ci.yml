@@ -31,7 +31,7 @@ collect_data:
     - jq --version 
 
     - mkdir -p ~/.kube #.kube Verzeichnis
-    - cp "$KUBE_CONFIG_DATA" > ~/.kube/config  # Kubernetes-Konfigurationsdatei aus den CI-Variablen laden
+    - cp "$KUBE_CONFIG_DATA" ~/.kube/config  # Kubernetes-Konfigurationsdatei aus den CI-Variablen laden
     - chmod 600 ~/.kube/config  # Berechtigungen für die Kubernetes-Konfigurationsdatei setzen
     - kubectl config view  # Überprüfen, ob die Kubernetes-Konfigurationsdatei korrekt ist
     - chmod +x scripts/cluster_crawler.sh  # Skript ausführbar machen
