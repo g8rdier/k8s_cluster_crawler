@@ -133,7 +133,7 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 done < "${NAMEID_MAP}"
 
 # Git-Token und Repository konfigurieren  
-GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@gitlab.com/devops-services/toolchain/docs.git"
+GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
 
 
 # Klonen des Repositories in ein temporäres Verzeichnis
