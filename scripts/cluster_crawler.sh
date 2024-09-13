@@ -151,8 +151,8 @@ create_directory "${INGRESS_PATH}"
 create_directory "${PODS_PATH}"
 
 # Kopiere die neuen Daten ins Repository-Verzeichnis
-cp -r "${INFO_CACHE}/*_ingress.json" "${INGRESS_PATH}/"
-cp -r "${INFO_CACHE}/*_pods.json" "${PODS_PATH}/"
+cp -r ${INFO_CACHE}/*_ingress.json "${INGRESS_PATH}/"
+cp -r ${INFO_CACHE}/*_pods.json "${PODS_PATH}/"
 
 # Automatischer Commit und Push
 cd "${REPO_DIR}" || exit
