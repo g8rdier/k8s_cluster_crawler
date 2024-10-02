@@ -13,6 +13,8 @@ lint:
   script:
     - apt-get update && apt-get install -y shellcheck
     - shellcheck scripts/cluster_crawler.sh
+  - shellcheck -e SC2034,SC2086 scripts/cluster_crawler.sh
+
 
 collect_data:
   stage: build
