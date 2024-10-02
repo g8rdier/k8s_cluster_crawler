@@ -14,7 +14,7 @@ lint:
   script:
     - shellcheck scripts/cluster_crawler.sh
 
-# Schritt 1: Kubernetes-Daten sammeln
+# Schritt 1: Kubernetes-Daten sammeln und deployen
 collect_data:
   stage: build
   script:
@@ -37,4 +37,5 @@ collect_data:
     - kubectl config view  # Überprüfen, ob die Kubernetes-Konfigurationsdatei korrekt ist
     - chmod +x scripts/cluster_crawler.sh  # Skript ausführbar machen
     - ./scripts/cluster_crawler.sh  # Datensammelskript ausführen
+    - python3/scripts/parser.py #Datenformatierungsskript ausführen
 
