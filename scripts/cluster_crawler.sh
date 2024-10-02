@@ -101,8 +101,8 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     log "DEBUG" "Fetching kubectl cluster contents for ${CLSTRNM}"
 
     # Define file paths for saving cluster information
-    CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
-    CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.json"
+    CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.md"
+    CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.md"
 
     if ! kubectl config get-contexts "${CLSTRNM}" &> /dev/null; then
         log "WARNING" "No kube context found for cluster '${CLSTRNM}', skipping..."
@@ -171,11 +171,11 @@ else
 fi
 
 # Configure Git with a generic user
-git config --global user.email "ci-bot@example.com"
-git config --global user.name "CI Bot"
+git config --global user.email "clustercrawler@f-i-ts.de"
+git config --global user.name "Clustercrawler"
 
 # Automate commit and push
 cd "${REPO_DIR}" || exit
 git add .
-git commit -m "Automated update of cluster data on $(date)"
+git commit -m "Automatisches Update der Cluster-Daten am $(date)"
 git push "${GIT_REPO_URL}" main
