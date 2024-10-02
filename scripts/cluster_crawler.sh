@@ -139,7 +139,7 @@ log "INFO" "Contents of directory ${INFO_CACHE}:"
 ls -l "${INFO_CACHE}"
 
 # Define the path to the Python script
-PYTHON_PARSER_PATH="parser.py"
+PYTHON_PARSER_PATH="scripts/parser.py"
 INPUT_DIR="${INFO_CACHE}"
 OUTPUT_DIR="${INFO_CACHE}"
 
