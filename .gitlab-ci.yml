@@ -1,9 +1,8 @@
-image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
+image: python:3.9  # Use a Python image with necessary tools
 
 stages:
   - validate
   - build
-  - deploy
 
 # Überprüfen des Shell-Skripts
 lint:
@@ -12,30 +11,40 @@ lint:
   variables:
     SHELLCHECK_OPTS: ""
   script:
+    - apt-get update && apt-get install -y shellcheck
     - shellcheck scripts/cluster_crawler.sh
 
-# Schritt 1: Kubernetes-Daten sammeln und deployen
 collect_data:
   stage: build
+  variables:
+    GIT_SSL_NO_VERIFY: "true"  # If necessary for your environment
   script:
-    # kubectl installieren
+    # Install necessary tools
+    - apt-get update && apt-get install -y curl jq git
+
+    # Install kubectl
     - KUBECTL_VERSION="v1.28.0"
     - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     - chmod +x kubectl
     - mv kubectl /usr/local/bin/kubectl
     - kubectl version --client  
 
-    # jq installieren
-    - curl -L -o jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
-    - chmod +x ./jq
-    - mv jq /usr/local/bin/jq
-    - jq --version 
+    # Install Python dependencies
+    - pip install --no-cache-dir tabulate
 
-    - mkdir -p ~/.kube #.kube Verzeichnis
-    - cp "$KUBE_CONFIG_DATA" ~/.kube/config  # Kubernetes-Konfigurationsdatei aus den CI-Variablen laden
-    - chmod 600 ~/.kube/config  # Berechtigungen für die Kubernetes-Konfigurationsdatei setzen
-    - kubectl config view  # Überprüfen, ob die Kubernetes-Konfigurationsdatei korrekt ist
-    - chmod +x scripts/cluster_crawler.sh  # Skript ausführbar machen
-    - ./scripts/cluster_crawler.sh  # Datensammelskript ausführen
-    - python3/scripts/parser.py #Datenformatierungsskript ausführen
+    # Set up Kubernetes config
+    - mkdir -p ~/.kube
+    - echo "$KUBE_CONFIG_DATA" > ~/.kube/config
+    - chmod 600 ~/.kube/config
+    - kubectl config view
 
+    # Ensure scripts are executable
+    - chmod +x scripts/cluster_crawler.sh
+    - chmod +x parser.py
+
+    # Run the cluster crawler script
+    - ./scripts/cluster_crawler.sh
+
+  # Define necessary environment variables
+  variables:
+    PUSH_BOM_PAGES: "$PUSH_BOM_PAGES"  # Ensure this variable is set in CI/CD variables
