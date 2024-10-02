@@ -159,7 +159,7 @@ def main():
     parser = argparse.ArgumentParser(description="Verarbeitet Kubernetes Ingress- und Pod-Daten und generiert separate Markdown-Berichte.")
     parser.add_argument('-dl', action='store_true', help="Aktiviert detailliertes Logging.")
     parser.add_argument('--input_dir', default='info_cache', help='Directory containing input JSON files.')
-    parser.add_argument('--output_dir', default='ergebnisse', help='Directory to save the Markdown output.")
+    parser.add_argument('--output_dir', default='ergebnisse', help='Directory to save the Markdown output.')
     args = parser.parse_args()
 
     configure_logging(args.dl)
