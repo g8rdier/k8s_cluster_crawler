@@ -35,7 +35,7 @@ collect_data:
 
     # Set up Kubernetes config
     - mkdir -p ~/.kube
-    - echo "$KUBE_CONFIG_DATA" > ~/.kube/config
+    - cp "$KUBE_CONFIG_DATA" ~/.kube/config
     - chmod 600 ~/.kube/config
     - kubectl config view
 
