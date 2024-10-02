@@ -149,6 +149,8 @@ python3 "$PYTHON_PARSER_PATH" -dl --input_dir "$INPUT_DIR" --output_dir "$OUTPUT
 # Git token and repository configuration
 GIT_REPO_URL="https://gitlab-ci-token:glpat-56GgxsraT5p9hfvWpCjG@git.f-i-ts.de/devops-services/toolchain/docs.git"
 
+echo "oauth: '${PUSH_BOM_PAGES}'"
+
 # Clone the repository into a temporary directory
 REPO_DIR="/tmp/docs-repo"
 if [ ! -d "${REPO_DIR}" ]; then
