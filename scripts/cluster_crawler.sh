@@ -101,8 +101,8 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     log "DEBUG" "Fetching kubectl cluster contents for ${CLSTRNM}"
 
     # Define file paths for saving cluster information
-    CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.md"
-    CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.md"
+    CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
+    CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.json"
 
     if ! kubectl config get-contexts "${CLSTRNM}" &> /dev/null; then
         log "WARNING" "No kube context found for cluster '${CLSTRNM}', skipping..."
@@ -138,6 +138,14 @@ done < "${NAMEID_MAP}"
 log "INFO" "Contents of directory ${INFO_CACHE}:"
 ls -l "${INFO_CACHE}"
 
+# Define the path to the Python script
+PYTHON_PARSER_PATH="parser.py"
+INPUT_DIR="${INFO_CACHE}"
+OUTPUT_DIR="${INFO_CACHE}"
+
+# Run the Python parser
+python3 "$PYTHON_PARSER_PATH" -dl --input_dir "$INPUT_DIR" --output_dir "$OUTPUT_DIR"
+
 # Git token and repository configuration
 GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
 
@@ -171,11 +179,20 @@ else
 fi
 
 # Configure Git with a generic user
-git config --global user.email "clustercrawler@f-i-ts.de"
-git config --global user.name "Clustercrawler"
-
-# Automate commit and push
 cd "${REPO_DIR}" || exit
-git add .
-git commit -m "Automatisches Update der Cluster-Daten am $(date)"
-git push "${GIT_REPO_URL}" main
+git config user.email "clustercrawler@f-i-ts.de"
+git config user.name "Clustercrawler"
+
+# Pull the latest changes
+git pull origin main
+
+# Stage all changes
+git add -A
+
+# Commit and push if there are changes
+if ! git diff --cached --quiet; then
+    git commit -m "Automatisches Update der Cluster-Daten am $(date)"
+    git push origin main
+else
+    echo "No changes to commit."
+fi
