@@ -1,76 +1,24 @@
-image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
-
 stages:
-  - validate
   - build
-  - deploy
 
-# Überprüfen des Shell-Skripts
-lint:
-  stage: validate
-  allow_failure: true
-  variables:
-    SHELLCHECK_OPTS: ""
-  script:
-    - shellcheck scripts/cluster_crawler.sh
-
-# Schritt 1: Kubernetes-Daten sammeln
-collect_data:
+build_cluster_info:
   stage: build
+  image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
+  variables:
+    KUBECONFIG_CONTENT: $KUBECONFIG_CONTENT  # Kubeconfig content stored as a CI variable
   script:
-    # kubectl installieren
-    - KUBECTL_VERSION="v1.28.0"
-    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    - chmod +x kubectl
-    - mv kubectl /usr/local/bin/kubectl
-    - kubectl version --client
-
-    # jq installieren
-    - curl -L -o jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
-    - chmod +x ./jq
-    - mv jq /usr/local/bin/jq
-    - jq --version
-
-    # Kubernetes-Konfiguration
+    - apt-get update && apt-get install -y kubectl jq git
     - mkdir -p ~/.kube
-    - echo "$KUBE_CONFIG_DATA" > ~/.kube/config  # Verwende 'echo' wenn KUBE_CONFIG_DATA den Inhalt enthält
+    - echo "$KUBECONFIG_CONTENT" > ~/.kube/config
     - chmod 600 ~/.kube/config
-    - kubectl config view  # Überprüfen, ob die Kubernetes-Konfigurationsdatei korrekt ist
-
-    # Skript ausführbar machen und ausführen
-    - chmod +x scripts/cluster_crawler.sh
-    - ./scripts/cluster_crawler.sh  # Datensammelskript ausführen
-
-    # Überprüfe, ob die Daten generiert wurden
-    - ls -l info_cache_*
-
-  artifacts:
-    paths:
-      - info_cache_*  # Füge die generierten Daten als Artefakte hinzu
-    expire_in: 1 hour  # Optional: Legt fest, wie lange die Artefakte gespeichert werden
-
-# Schritt 2: Daten in das Docs-Repository deployen
-deploy_data:
-  stage: deploy
-  dependencies:
-    - collect_data  # Stellt sicher, dass die Artefakte von 'collect_data' verfügbar sind
-  script:
-    # Git-Konfiguration mit CI-Anmeldeinformationen
-    - git config --global user.name "GitLab CI"
-    - git config --global user.email "ci@example.com"
-
-    # Klone das Docs-Repository
-    - GIT_REPO_URL="https://${PUSH_BOM_PAGES}@gitlab.com/devops-services/toolchain/docs.git"
-    - git clone "${GIT_REPO_URL}" docs-repo
-
-    # Kopiere die Dateien aus dem Output-Verzeichnis des Skripts in die entsprechenden Pfade des Docs-Repos
-    - mkdir -p docs-repo/boms/k8s/ingress
-    - mkdir -p docs-repo/boms/k8s/pods
-    - cp -r info_cache_*/\*_ingress.json docs-repo/boms/k8s/ingress/
-    - cp -r info_cache_*/\*_pods.json docs-repo/boms/k8s/pods/
-
-    # Füge die Änderungen zu Git hinzu, erstelle einen Commit und pushe die Änderungen in das Docs-Repo
-    - cd docs-repo
-    - git add boms/k8s/ingress boms/k8s/pods
-    - git commit -m "Automatisches Update der Cluster-Daten am $(date)"
-    - git push origin main  # Passe den Branch bei Bedarf an
+    - ./your_bash_script.sh
+    - if [ -d "info_cache_*" ]; then
+        echo "info_cache_* directory exists.";
+      else
+        echo "Error: info_cache_* directory does not exist.";
+        exit 1;
+      fi
+    - mkdir -p boms/k8s/ingress
+    - mkdir -p boms/k8s/pods
+    - cp -r info_cache_*/ingress.json boms/k8s/ingress/
+    - cp -r info_cache_*/pods.json boms/k8s/pods/
