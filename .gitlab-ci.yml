@@ -21,6 +21,7 @@ collect_data:
     GIT_SSL_NO_VERIFY: "true"  
   script:
     
+    - export
     - apt-get update && apt-get install -y curl jq git
 
     # Install kubectl
@@ -45,7 +46,3 @@ collect_data:
 
     # Run the cluster crawler script
     - ./scripts/cluster_crawler.sh
-
-  # Define necessary environment variables
-  variables:
-    PUSH_BOM_PAGES: "$PUSH_BOM_PAGES"  # Ensure this variable is set in CI/CD variables
