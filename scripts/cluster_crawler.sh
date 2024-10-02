@@ -196,3 +196,4 @@ if ! git diff --cached --quiet; then
 else
     echo "No changes to commit."
 fi
+exit 0
