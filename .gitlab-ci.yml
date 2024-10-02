@@ -41,7 +41,7 @@ collect_data:
 
     # Ensure scripts are executable
     - chmod +x scripts/cluster_crawler.sh
-    - chmod +x parser.py
+    - chmod +x scripts/parser.py
 
     # Run the cluster crawler script
     - ./scripts/cluster_crawler.sh
