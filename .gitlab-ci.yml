@@ -18,7 +18,7 @@ lint:
 collect_data:
   stage: build
   variables:
-    GIT_SSL_NO_VERIFY: "false"  # If necessary for your environment
+    GIT_SSL_NO_VERIFY: "true"  # If necessary for your environment
   script:
     # Install necessary tools
     - apt-get update && apt-get install -y curl jq git
