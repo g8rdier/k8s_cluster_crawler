@@ -73,7 +73,7 @@ fi
 
 if [ "${FORCE_REBUILD}" == "1" ]; then
     log "INFO" "FORCE_REBUILD is set to 1, updating all cached cluster information"
-    rm -rf ${INFO_CACHE:?}/* > /dev/null 2>&1 || true
+    rm -rf "${INFO_CACHE:?}"/* > /dev/null 2>&1 || true
 else
     log "INFO" "FORCE_REBUILD is not set to 1, using cached cluster information"
 fi
@@ -164,14 +164,14 @@ create_directory "${INGRESS_PATH}"
 create_directory "${PODS_PATH}"
 
 # Copy the new data into the repository directory
-if ! cp -r ${INFO_CACHE}/*_ingress.md "${INGRESS_PATH}/"; then
+if ! cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/"; then
     log "ERROR" "Error copying ingress files"
     exit 1
 else
     log "INFO" "Ingress files copied successfully"
 fi
 
-if ! cp -r ${INFO_CACHE}/*_pods.md "${PODS_PATH}/"; then
+if ! cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
     log "ERROR" "Error copying pods files"
     exit 1
 else
