@@ -147,7 +147,7 @@ OUTPUT_DIR="${INFO_CACHE}"
 python3 "$PYTHON_PARSER_PATH" -dl --input_dir "$INPUT_DIR" --output_dir "$OUTPUT_DIR"
 
 # Git token and repository configuration
-GIT_REPO_URL="https://{PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
+GIT_REPO_URL="https://oauth:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
 
 # Clone the repository into a temporary directory
 REPO_DIR="/tmp/docs-repo"
