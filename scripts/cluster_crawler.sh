@@ -156,14 +156,14 @@ create_directory "${INGRESS_PATH}"
 create_directory "${PODS_PATH}"
 
 # Copy the new data into the repository directory
-if ! cp -r ${INFO_CACHE}/*_ingress.json "${INGRESS_PATH}/"; then
+if ! cp -r ${INFO_CACHE}/*_ingress.md "${INGRESS_PATH}/"; then
     log "ERROR" "Error copying ingress files"
     exit 1
 else
     log "INFO" "Ingress files copied successfully"
 fi
 
-if ! cp -r ${INFO_CACHE}/*_pods.json "${PODS_PATH}/"; then
+if ! cp -r ${INFO_CACHE}/*_pods.md "${PODS_PATH}/"; then
     log "ERROR" "Error copying pods files"
     exit 1
 else
