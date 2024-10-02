@@ -180,8 +180,8 @@ fi
 
 # Configure Git with a generic user
 cd "${REPO_DIR}" || exit
-git config user.email "clustercrawler@f-i-ts.de"
-git config user.name "Clustercrawler"
+git config user.email "ci@example.com"
+git config user.name "CI Bot"
 
 # Pull the latest changes
 git pull origin main
