@@ -19,7 +19,7 @@ collect_data:
     # Set up Kubernetes config securely
     - mkdir -p ~/.kube
     # Directly decode the KUBE_CONFIG_DATA into the Kubernetes config file
-    - echo "$KUBE_CONFIG_DATA" | base64 --decode > ~/.kube/config
+    - echo "$KUBE_CONFIG_DATA_1" | base64 --decode > ~/.kube/config
     - chmod 600 ~/.kube/config
 
     # Check the Kubernetes config without exposing sensitive information
