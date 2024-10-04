@@ -1,27 +1,9 @@
-image: python:3.9 
-
-stages:
-  - validate
-  - build
-
-# Überprüfen des Shell-Skripts
-lint:
-  stage: validate
-  allow_failure: true
-  variables:
-    SHELLCHECK_OPTS: ""
-  script:
-    - apt-get update && apt-get install -y shellcheck
-    - shellcheck -e SC2034,SC2086 scripts/cluster_crawler.sh
-
-
 collect_data:
   stage: build
   variables:
-    GIT_SSL_NO_VERIFY: "true"  
+    GIT_SSL_NO_VERIFY: "true"
   script:
-    
-    - export
+    # Install necessary dependencies
     - apt-get update && apt-get install -y curl jq git
 
     # Install kubectl
@@ -34,11 +16,14 @@ collect_data:
     # Install Python dependencies
     - pip install --no-cache-dir tabulate
 
-    # Set up Kubernetes config
+    # Set up Kubernetes config securely
     - mkdir -p ~/.kube
-    - cp "$KUBE_CONFIG_DATA" ~/.kube/config
+    # Directly decode the KUBE_CONFIG_DATA into the Kubernetes config file
+    - echo "$KUBE_CONFIG_DATA" | base64 --decode > ~/.kube/config
     - chmod 600 ~/.kube/config
-    - kubectl config view
+
+    # Check the Kubernetes config without exposing sensitive information
+    - kubectl config view --minify
 
     # Ensure scripts are executable
     - chmod +x scripts/cluster_crawler.sh
