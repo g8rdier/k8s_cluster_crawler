@@ -3,8 +3,9 @@ collect_data:
   variables:
     GIT_SSL_NO_VERIFY: "true"
   script:
-    # Install necessary dependencies
-    - apt-get update && apt-get install -y curl jq git
+    # Install EPEL repository and necessary dependencies
+    - yum install -y epel-release
+    - yum update -y && yum install -y curl jq git python3 python3-pip
 
     # Install kubectl
     - KUBECTL_VERSION="v1.28.0"
@@ -14,11 +15,10 @@ collect_data:
     - kubectl version --client  
 
     # Install Python dependencies
-    - pip install --no-cache-dir tabulate
+    - pip3 install --no-cache-dir tabulate
 
     # Set up Kubernetes config securely
     - mkdir -p ~/.kube
-    # Directly decode the KUBE_CONFIG_DATA into the Kubernetes config file
     - echo "$KUBE_CONFIG_DATA_1" | base64 --decode > ~/.kube/config
     - chmod 600 ~/.kube/config
 
