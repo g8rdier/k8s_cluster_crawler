@@ -4,7 +4,6 @@ collect_data:
   timeout: 60m  # Increase timeout to 60 minutes
   variables:
     GIT_SSL_NO_VERIFY: "true"
-    SHELLOPTS: xtrace  # Enable shell debugging for detailed logs
   script:
     # Display OS information
     - echo "Displaying OS information"
