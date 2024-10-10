@@ -106,24 +106,28 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
 
     for file in "$KUBECONFIGS_DIR"/*; do
         cluster_name=$(basename "$file" | sed 's/_kubeconfig//' | tr '_' '-')
+        echo "Processing file $file with cluster name $cluster_name"
         export KUBECONFIG="$file"
         current_context=$(kubectl config current-context)
+        echo "Current context is '$current_context'"
         if [ "$current_context" != "$cluster_name" ]; then
-            kubectl config rename-context "$current_context" "$cluster_name"
-            log "DEBUG" "Renamed context '$current_context' to '$cluster_name' in file '$file'"
+            kubectl config rename-context "$current_context" "$cluster_name" || { echo "Error renaming context for $cluster_name"; exit 1; }
+            echo "Renamed context '$current_context' to '$cluster_name'"
         fi
     done
 
     # Merge all kubeconfig files into a single file
+    echo "Merging kubeconfig files:"
     export KUBECONFIG=$(find "$KUBECONFIGS_DIR" -type f -exec printf '{}:' \;)
-    kubectl config view --flatten > /tmp/merged_kubeconfig
-    export KUBECONFIG=/tmp/merged_kubeconfig
+    kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
 
-    # Verify contexts
-    log "INFO" "Available contexts after merging kubeconfigs:"
-    kubectl config get-contexts
+    # Verify contexts after merging
+    echo "Available contexts after merging kubeconfig files:"
+    kubectl config get-contexts || { echo "Error retrieving contexts from merged kubeconfig"; exit 1; }
+
 else
-    log "WARNING" "Kubeconfigs directory '$KUBECONFIGS_DIR' not found. Skipping context renaming."
+    echo "Kubeconfig directory not found!"
+    exit 1
 fi
 
 # Build a mapping from cluster names to context names
@@ -142,43 +146,21 @@ done
 
 # Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
 while IFS=";" read -r CLSTRNM _CLSTRID; do
-    log "DEBUG" "Processing cluster '${CLSTRNM}'"
+    echo "Processing cluster: $CLSTRNM"
 
     context="${cluster_context_map[$CLSTRNM]}"
-
     if [ -z "$context" ]; then
-        log "WARNING" "No matching context found for cluster '${CLSTRNM}', skipping..."
+        echo "No matching context for cluster $CLSTRNM, skipping..."
         continue
     fi
 
-    log "INFO" "Using context '$context' for cluster '${CLSTRNM}'"
+    echo "Using context: $context for cluster: $CLSTRNM"
+    set_kube_context "$context" || { echo "Failed to switch to context $context"; continue; }
 
-    CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
-    CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.json"
-
-    if ! set_kube_context "$context"; then
-        log "ERROR" "Error setting kube context for cluster '${CLSTRNM}'"
-        debug_crawler_error
-        continue  # Skip to the next cluster instead of exiting
-    fi
-
-    KUBE_VERSION=$(kubectl version --output=json | jq -r '.serverVersion.gitVersion')
-
-    if ! kubectl get pods -A -o json | jq --arg k8s_version "$KUBE_VERSION" '.items |= map(. + {kubernetesVersion: $k8s_version})' > "${CLSTR_PODS}"; then
-        log "ERROR" "Error fetching pods for cluster '${CLSTRNM}'"
-        debug_crawler_error
-        continue  # Skip to the next cluster instead of exiting
-    else
-        log "INFO" "Pod data for cluster '${CLSTRNM}' saved successfully"
-    fi
-
-    if ! kubectl get ingress -A -o json > "${CLSTR_INGRESS}"; then
-        log "ERROR" "Error fetching ingress for cluster '${CLSTRNM}'"
-        debug_crawler_error
-        continue  # Skip to the next cluster instead of exiting
-    else
-        log "INFO" "Ingress data for cluster '${CLSTRNM}' saved successfully"
-    fi
+    # Fetch data for the cluster
+    echo "Fetching pod and ingress data for $CLSTRNM"
+    kubectl get pods -A -o json > "${INFO_CACHE}/${CLSTRNM}_pods.json" || { echo "Failed to get pod data for $CLSTRNM"; continue; }
+    kubectl get ingress -A -o json > "${INFO_CACHE}/${CLSTRNM}_ingress.json" || { echo "Failed to get ingress data for $CLSTRNM"; continue; }
 done < "${NAMEID_MAP}"
 
 # Show contents of the info cache directory
