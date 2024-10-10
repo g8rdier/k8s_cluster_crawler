@@ -1,29 +1,37 @@
 collect_data:
   stage: build
   image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
+  timeout: 60m  # Increase timeout to 60 minutes
   variables:
     GIT_SSL_NO_VERIFY: "true"
+    SHELLOPTS: xtrace  # Enable shell debugging for detailed logs
   script:
     # Display OS information
+    - echo "Displaying OS information"
     - cat /etc/os-release || lsb_release -a || uname -a
 
     # Update package lists and install dependencies
-    - apt-get update && apt-get install -y curl jq python3 python3-pip git
+    - echo "Updating package lists and installing dependencies"
+    - apt-get update && apt-get install -y curl jq python3 python3-pip git || { echo "Error installing dependencies"; exit 1; }
 
     # Install kubectl
+    - echo "Installing kubectl"
     - KUBECTL_VERSION="v1.28.0"
-    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" || { echo "Error downloading kubectl"; exit 1; }
     - chmod +x kubectl
     - mv kubectl /usr/local/bin/kubectl
-    - kubectl version --client
+    - kubectl version --client || { echo "Error verifying kubectl installation"; exit 1; }
 
     # Install Python dependencies
-    - pip3 install --no-cache-dir tabulate
+    - echo "Installing Python dependencies"
+    - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
 
     # Create a temporary directory for kubeconfig files
-    - mkdir -p /tmp/kubeconfigs
+    - echo "Creating directory for kubeconfig files"
+    - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
     # Check if kubeconfig variables are set
+    - echo "Checking if kubeconfig variables are set"
     - for var in ftctl_pf01_kubeconfig ftctl_ps01_kubeconfig fttc_pdf01_kubeconfig fttc_pds01_kubeconfig fttc_tdf01_kubeconfig fttc_tds01_kubeconfig fttc_tf01_kubeconfig fttc_ts01_kubeconfig; do
         echo "Checking if $var is set";
         if [ -z "${!var}" ]; then
@@ -34,43 +42,43 @@ collect_data:
       done
 
     # Write each kubeconfig variable to a file
-    # For Variable Type Variables (base64-encoded)
-    - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig
-    - echo "$ftctl_ps01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig
-    - echo "$fttc_pdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig
-    - echo "$fttc_pds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig
-    - echo "$fttc_tf01_kubeconfig"   | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig
-    - echo "$fttc_ts01_kubeconfig"   | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig
-    - echo "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig
-    - echo "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig
+    - echo "Writing kubeconfig variables to files"
+    - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
 
     # Secure the kubeconfig files
-    - chmod 600 /tmp/kubeconfigs/*
+    - echo "Securing kubeconfig files"
+    - chmod 600 /tmp/kubeconfigs/* || { echo "Error securing kubeconfig files"; exit 1; }
 
     # Verify the contents of kubeconfig files
+    - echo "Verifying the contents of kubeconfig files"
     - for file in /tmp/kubeconfigs/*; do
         echo "Contents of $file:";
-        head -n 5 "$file";
+        head -n 5 "$file" || { echo "Error reading file $file"; exit 1; }
       done
 
     # Merge the kubeconfig files
-    - export KUBECONFIG=$(ls -1 /tmp/kubeconfigs/* | tr '\n' ':')
-    - kubectl config view --flatten > /tmp/merged_kubeconfig
+    - echo "Merging the kubeconfig files"
+    - export KUBECONFIG=$(ls -1 /tmp/kubeconfigs/* | tr '\n' ':') || { echo "Error merging kubeconfigs"; exit 1; }
+    - kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
 
     # Use the merged kubeconfig
+    - echo "Using the merged kubeconfig"
     - export KUBECONFIG=/tmp/merged_kubeconfig
 
     # Verify the contexts in the merged kubeconfig
-    - echo "Available contexts in merged kubeconfig:"
-    - kubectl config get-contexts
+    - echo "Verifying the contexts in merged kubeconfig"
+    - kubectl config get-contexts || { echo "Error getting contexts"; exit 1; }
 
     # Ensure scripts are executable
+    - echo "Ensuring scripts are executable"
     - chmod +x scripts/cluster_crawler.sh
     - chmod +x scripts/parser.py
 
     # Run the cluster crawler script
-    - ./scripts/cluster_crawler.sh
+    - echo "Running cluster crawler script"
+    - ./scripts/cluster_crawler.sh || { echo "Cluster crawler script failed"; exit 1; }
 
     # Clean up temporary files
-    - rm -rf /tmp/kubeconfigs
-    - rm -f /tmp/merged_kubeconfig
+    - echo "Cleaning up temporary files"
+    - rm -rf /tmp/kubeconfigs || { echo "Error cleaning kubeconfigs"; exit 1; }
+    - rm -f /tmp/merged_kubeconfig || { echo "Error cleaning merged kubeconfig"; exit 1; }
