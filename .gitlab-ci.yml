@@ -1,15 +1,25 @@
 collect_data:
   stage: build
-  tags:
-    - my-runner-tag
+  image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
   variables:
     GIT_SSL_NO_VERIFY: "true"
   script:
+    # Display OS information (optional, helps in debugging)
+    - echo "Operating System Information:"
+    - cat /etc/os-release || lsb_release -a || uname -a
 
-    - echo "Running with specific runner"
-    # Install dependencies
-    - yum install -y epel-release
-    - yum update -y && yum install -y curl jq git python3 python3-pip
+    # Update package lists and install dependencies
+    # Adjust the package manager based on the base OS
+
+    # If the base image is Debian/Ubuntu-based:
+    - apt-get update && apt-get install -y curl jq python3 python3-pip git
+
+    # If the base image is Alpine Linux:
+    # - apk update && apk add curl jq python3 py3-pip git
+
+    # If the base image is CentOS/RHEL-based:
+    # - yum install -y epel-release
+    # - yum update -y && yum install -y curl jq git python3 python3-pip
 
     # Install kubectl
     - KUBECTL_VERSION="v1.28.0"
@@ -57,3 +67,9 @@ collect_data:
     # Clean up temporary files
     - rm -rf /tmp/kubeconfigs
     - rm -f /tmp/merged_kubeconfig
+
+  # Adjust or remove the 'tags' keyword
+  # If your runner requires a specific tag, update it accordingly
+  # Remove the 'tags' section if you want any runner to pick up the job
+  # tags:
+  #   - my-runner-tag
