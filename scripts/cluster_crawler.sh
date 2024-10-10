@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e  # Exit immediately if a command exits with a non-zero status
 
-# Logging function (depending on the logging flag)
+# Logging function with detailed or regular logging based on a flag
 log() {
     local level="$1"
     local message="$2"
@@ -12,7 +12,7 @@ log() {
     fi
 }
 
-# Standard logging level
+# Standard logging level is not detailed unless passed as an argument
 DETAILLIERTES_LOGGING=false
 
 # Parse command-line arguments
@@ -24,7 +24,7 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# Script to collect data from all clusters
+# List of clusters
 UNSERE_CLUSTER="fttc ftctl"
 
 # Marker file to track if the script has already run successfully
@@ -39,7 +39,7 @@ fi
 
 # Function to create a directory if it doesn't exist
 create_directory() {
-    locDir="${1}"
+    local locDir="${1}"
     if [ ! -d "${locDir}" ]; then
         mkdir -p "${locDir}" > /dev/null
     fi
@@ -71,6 +71,7 @@ if ! create_directory "${INFO_CACHE}"; then
     exit 1
 fi
 
+# Rebuild cache if needed
 if [ "${FORCE_REBUILD}" == "1" ]; then
     log "INFO" "FORCE_REBUILD is set to 1, updating all cached cluster information"
     rm -rf "${INFO_CACHE:?}"/* > /dev/null 2>&1 || true
@@ -97,10 +98,6 @@ else
 fi
 
 # New section: Rename contexts in kubeconfig files to ensure uniqueness
-# Assuming that your kubeconfig files are located in /tmp/kubeconfigs
-# and are already decoded and saved there
-
-# Directory containing individual kubeconfig files
 KUBECONFIGS_DIR="/tmp/kubeconfigs"
 
 # Check if the directory exists
@@ -108,7 +105,6 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
     log "INFO" "Renaming contexts in kubeconfig files to ensure uniqueness"
 
     for file in "$KUBECONFIGS_DIR"/*; do
-        # Extract cluster name from filename and replace underscores with hyphens
         cluster_name=$(basename "$file" | sed 's/_kubeconfig//' | tr '_' '-')
         export KUBECONFIG="$file"
         current_context=$(kubectl config current-context)
@@ -138,17 +134,9 @@ declare -A cluster_context_map
 available_contexts=$(kubectl config get-contexts -o name)
 
 for context in $available_contexts; do
-    # Get the cluster associated with the context
     cluster_info=$(kubectl config view -o jsonpath="{.contexts[?(@.name=='$context')].context.cluster}")
-    # Get the server URL
-    server_url=$(kubectl config view -o jsonpath="{.clusters[?(@.name=='$cluster_info')].cluster.server}")
-
-    # Extract the cluster name from the context name
     cluster_name_from_context="$context"
-
-    # Map cluster name to context
     cluster_context_map["$cluster_name_from_context"]="$context"
-
     log "DEBUG" "Mapped cluster '$cluster_name_from_context' to context '$context'"
 done
 
@@ -156,7 +144,6 @@ done
 while IFS=";" read -r CLSTRNM _CLSTRID; do
     log "DEBUG" "Processing cluster '${CLSTRNM}'"
 
-    # Get the context name for this cluster
     context="${cluster_context_map[$CLSTRNM]}"
 
     if [ -z "$context" ]; then
@@ -166,14 +153,13 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 
     log "INFO" "Using context '$context' for cluster '${CLSTRNM}'"
 
-    # Define file paths for saving cluster information
     CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
     CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.json"
 
     if ! set_kube_context "$context"; then
         log "ERROR" "Error setting kube context for cluster '${CLSTRNM}'"
         debug_crawler_error
-        exit 1
+        continue  # Skip to the next cluster instead of exiting
     fi
 
     KUBE_VERSION=$(kubectl version --output=json | jq -r '.serverVersion.gitVersion')
@@ -181,7 +167,7 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     if ! kubectl get pods -A -o json | jq --arg k8s_version "$KUBE_VERSION" '.items |= map(. + {kubernetesVersion: $k8s_version})' > "${CLSTR_PODS}"; then
         log "ERROR" "Error fetching pods for cluster '${CLSTRNM}'"
         debug_crawler_error
-        exit 1
+        continue  # Skip to the next cluster instead of exiting
     else
         log "INFO" "Pod data for cluster '${CLSTRNM}' saved successfully"
     fi
@@ -189,7 +175,7 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     if ! kubectl get ingress -A -o json > "${CLSTR_INGRESS}"; then
         log "ERROR" "Error fetching ingress for cluster '${CLSTRNM}'"
         debug_crawler_error
-        exit 1
+        continue  # Skip to the next cluster instead of exiting
     else
         log "INFO" "Ingress data for cluster '${CLSTRNM}' saved successfully"
     fi
@@ -217,7 +203,6 @@ REPO_DIR="/tmp/docs-repo"
 if [ ! -d "${REPO_DIR}" ]; then
     git clone "${GIT_REPO_URL}" "${REPO_DIR}"
 else
-    # Pull the latest changes if the repository already exists
     cd "${REPO_DIR}" || exit
     git pull origin main
     cd - || exit
