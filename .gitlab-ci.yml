@@ -3,27 +3,45 @@ collect_data:
   variables:
     GIT_SSL_NO_VERIFY: "true"
   script:
-    # Install EPEL repository and necessary dependencies
+    # Install dependencies
     - yum install -y epel-release
     - yum update -y && yum install -y curl jq git python3 python3-pip
 
     # Install kubectl
     - KUBECTL_VERSION="v1.28.0"
-    - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
     - chmod +x kubectl
     - mv kubectl /usr/local/bin/kubectl
-    - kubectl version --client  
+    - kubectl version --client
 
     # Install Python dependencies
     - pip3 install --no-cache-dir tabulate
 
-    # Set up Kubernetes config securely
-    - mkdir -p ~/.kube
-    - echo "$KUBE_CONFIG_DATA_1" | base64 --decode > ~/.kube/config
-    - chmod 600 ~/.kube/config
+    # Create a temporary directory for kubeconfig files
+    - mkdir -p /tmp/kubeconfigs
 
-    # Check the Kubernetes config without exposing sensitive information
-    - kubectl config view --minify
+    # Write each kubeconfig variable to a file
+    - echo "$FTCTL_PF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig
+    - echo "$FTCTL_PS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig
+    - echo "$FTTC_PDF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig
+    - echo "$FTTC_PDS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig
+    - echo "$FTTC_TDF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig
+    - echo "$FTTC_TDS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig
+    - echo "$FTTC_TF01_KUBECONFIG"   | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig
+    - echo "$FTTC_TS01_KUBECONFIG"   | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig
+
+    # Secure the kubeconfig files
+    - chmod 600 /tmp/kubeconfigs/*
+
+    # Merge the kubeconfig files
+    - export KUBECONFIG=$(ls -1 /tmp/kubeconfigs/* | tr '\n' ':')
+    - kubectl config view --flatten > /tmp/merged_kubeconfig
+
+    # Use the merged kubeconfig
+    - export KUBECONFIG=/tmp/merged_kubeconfig
+
+    # Optional: Verify the contexts
+    - kubectl config get-contexts
 
     # Ensure scripts are executable
     - chmod +x scripts/cluster_crawler.sh
@@ -31,3 +49,7 @@ collect_data:
 
     # Run the cluster crawler script
     - ./scripts/cluster_crawler.sh
+
+    # Clean up temporary files
+    - rm -rf /tmp/kubeconfigs
+    - rm -f /tmp/merged_kubeconfig
