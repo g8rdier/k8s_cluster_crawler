@@ -4,7 +4,7 @@ collect_data:
   variables:
     GIT_SSL_NO_VERIFY: "true"
   script:
-    # Display OS information (optional)
+    # Display OS information
     - cat /etc/os-release || lsb_release -a || uname -a
 
     # Update package lists and install dependencies
@@ -23,18 +23,24 @@ collect_data:
     # Create a temporary directory for kubeconfig files
     - mkdir -p /tmp/kubeconfigs
 
-    # Write each kubeconfig variable to a file (without base64 decoding)
-    - echo "$FTCTL_PF01_KUBECONFIG" > /tmp/kubeconfigs/ftctl_pf01_kubeconfig
-    - echo "$FTCTL_PS01_KUBECONFIG" > /tmp/kubeconfigs/ftctl_ps01_kubeconfig
-    - echo "$FTTC_PDF01_KUBECONFIG" > /tmp/kubeconfigs/fttc_pdf01_kubeconfig
-    - echo "$FTTC_PDS01_KUBECONFIG" > /tmp/kubeconfigs/fttc_pds01_kubeconfig
-    - echo "$FTTC_TDF01_KUBECONFIG" > /tmp/kubeconfigs/fttc_tdf01_kubeconfig
-    - echo "$FTTC_TDS01_KUBECONFIG" > /tmp/kubeconfigs/fttc_tds01_kubeconfig
-    - echo "$FTTC_TF01_KUBECONFIG"   > /tmp/kubeconfigs/fttc_tf01_kubeconfig
-    - echo "$FTTC_TS01_KUBECONFIG"   > /tmp/kubeconfigs/fttc_ts01_kubeconfig
+    # Write each kubeconfig variable to a file (with base64 decoding)
+    - echo "$FTCTL_PF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig
+    - echo "$FTCTL_PS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig
+    - echo "$FTTC_PDF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig
+    - echo "$FTTC_PDS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig
+    - echo "$FTTC_TDF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig
+    - echo "$FTTC_TDS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig
+    - echo "$FTTC_TF01_KUBECONFIG"   | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig
+    - echo "$FTTC_TS01_KUBECONFIG"   | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig
 
     # Secure the kubeconfig files
     - chmod 600 /tmp/kubeconfigs/*
+
+    # Verify the contents of kubeconfig files
+    - for file in /tmp/kubeconfigs/*; do
+        echo "Contents of $file:";
+        cat "$file" | head -n 15;
+      done
 
     # Merge the kubeconfig files
     - export KUBECONFIG=$(ls -1 /tmp/kubeconfigs/* | tr '\n' ':')
@@ -43,7 +49,8 @@ collect_data:
     # Use the merged kubeconfig
     - export KUBECONFIG=/tmp/merged_kubeconfig
 
-    # Verify the contexts
+    # Verify the contexts in the merged kubeconfig
+    - echo "Available contexts in merged kubeconfig:"
     - kubectl config get-contexts
 
     # Ensure scripts are executable
