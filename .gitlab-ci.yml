@@ -24,7 +24,7 @@ collect_data:
     - mkdir -p /tmp/kubeconfigs
 
     # Check if kubeconfig variables are set
-    - for var in FTCTL_PF01_KUBECONFIG FTCTL_PS01_KUBECONFIG FTTC_PDF01_KUBECONFIG FTTC_PDS01_KUBECONFIG FTTC_TDF01_KUBECONFIG FTTC_TDS01_KUBECONFIG FTTC_TF01_KUBECONFIG FTTC_TS01_KUBECONFIG; do
+    - for var in ftctl_pf01_kubeconfig ftctl_ps01_kubeconfig fttc_pdf01_kubeconfig fttc_pds01_kubeconfig fttc_tdf01_kubeconfig fttc_tds01_kubeconfig fttc_tf01_kubeconfig fttc_ts01_kubeconfig; do
         echo "Checking if $var is set";
         if [ -z "${!var}" ]; then
           echo "Variable $var is NOT set or is empty";
@@ -34,14 +34,14 @@ collect_data:
       done
 
     # Write each kubeconfig variable to a file (assuming base64-encoded)
-    - echo "$FTCTL_PF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig
-    - echo "$FTCTL_PS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig
-    - echo "$FTTC_PDF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig
-    - echo "$FTTC_PDS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig
-    - echo "$FTTC_TDF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig
-    - echo "$FTTC_TDS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig
-    - echo "$FTTC_TF01_KUBECONFIG"   | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig
-    - echo "$FTTC_TS01_KUBECONFIG"   | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig
+    - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig
+    - echo "$ftctl_ps01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig
+    - echo "$fttc_pdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig
+    - echo "$fttc_pds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig
+    - echo "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig
+    - echo "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig
+    - echo "$fttc_tf01_kubeconfig"   | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig
+    - echo "$fttc_ts01_kubeconfig"   | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig
 
     # Secure the kubeconfig files
     - chmod 600 /tmp/kubeconfigs/*
