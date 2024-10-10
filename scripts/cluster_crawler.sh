@@ -108,7 +108,8 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
     log "INFO" "Renaming contexts in kubeconfig files to ensure uniqueness"
 
     for file in "$KUBECONFIGS_DIR"/*; do
-        cluster_name=$(basename "$file" | sed 's/_kubeconfig//')
+        # Extract cluster name from filename and replace underscores with hyphens
+        cluster_name=$(basename "$file" | sed 's/_kubeconfig//' | tr '_' '-')
         export KUBECONFIG="$file"
         current_context=$(kubectl config current-context)
         if [ "$current_context" != "$cluster_name" ]; then
@@ -142,8 +143,7 @@ for context in $available_contexts; do
     # Get the server URL
     server_url=$(kubectl config view -o jsonpath="{.clusters[?(@.name=='$cluster_info')].cluster.server}")
 
-    # Extract the cluster name from the server URL or context name
-    # Here, we assume the context name is the cluster name
+    # Extract the cluster name from the context name
     cluster_name_from_context="$context"
 
     # Map cluster name to context
