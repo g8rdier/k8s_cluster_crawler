@@ -33,15 +33,18 @@ collect_data:
         fi
       done
 
-    # Write each kubeconfig variable to a file (assuming base64-encoded)
+    # Write each kubeconfig variable to a file
+    # For Variable Type Variables (base64-encoded)
     - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig
     - echo "$ftctl_ps01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig
     - echo "$fttc_pdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig
     - echo "$fttc_pds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig
-    - echo "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig
-    - echo "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig
     - echo "$fttc_tf01_kubeconfig"   | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig
     - echo "$fttc_ts01_kubeconfig"   | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig
+
+    # For File Type Variables (plain text)
+    - cp "$fttc_tdf01_kubeconfig" /tmp/kubeconfigs/fttc_tdf01_kubeconfig
+    - cp "$fttc_tds01_kubeconfig" /tmp/kubeconfigs/fttc_tds01_kubeconfig
 
     # Secure the kubeconfig files
     - chmod 600 /tmp/kubeconfigs/*
@@ -49,7 +52,7 @@ collect_data:
     # Verify the contents of kubeconfig files
     - for file in /tmp/kubeconfigs/*; do
         echo "Contents of $file:";
-        cat "$file" | head -n 5;
+        head -n 5 "$file";
       done
 
     # Merge the kubeconfig files
