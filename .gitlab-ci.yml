@@ -23,7 +23,17 @@ collect_data:
     # Create a temporary directory for kubeconfig files
     - mkdir -p /tmp/kubeconfigs
 
-    # Write each kubeconfig variable to a file (with base64 decoding)
+    # Check if kubeconfig variables are set
+    - for var in FTCTL_PF01_KUBECONFIG FTCTL_PS01_KUBECONFIG FTTC_PDF01_KUBECONFIG FTTC_PDS01_KUBECONFIG FTTC_TDF01_KUBECONFIG FTTC_TDS01_KUBECONFIG FTTC_TF01_KUBECONFIG FTTC_TS01_KUBECONFIG; do
+        echo "Checking if $var is set";
+        if [ -z "${!var}" ]; then
+          echo "Variable $var is NOT set or is empty";
+        else
+          echo "Variable $var is set";
+        fi
+      done
+
+    # Write each kubeconfig variable to a file (assuming base64-encoded)
     - echo "$FTCTL_PF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig
     - echo "$FTCTL_PS01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig
     - echo "$FTTC_PDF01_KUBECONFIG" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig
@@ -39,7 +49,7 @@ collect_data:
     # Verify the contents of kubeconfig files
     - for file in /tmp/kubeconfigs/*; do
         echo "Contents of $file:";
-        cat "$file" | head -n 15;
+        cat "$file" | head -n 5;
       done
 
     # Merge the kubeconfig files
