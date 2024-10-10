@@ -96,20 +96,47 @@ else
     exit 1
 fi
 
+# Build a mapping from cluster names to context names
+log "INFO" "Building cluster to context mapping"
+
+declare -A cluster_context_map
+
+available_contexts=$(kubectl config get-contexts -o name)
+
+for context in $available_contexts; do
+    # Get the cluster associated with the context
+    cluster_info=$(kubectl config view -o jsonpath="{.contexts[?(@.name=='$context')].context.cluster}")
+    # Get the server URL
+    server_url=$(kubectl config view -o jsonpath="{.clusters[?(@.name=='$cluster_info')].cluster.server}")
+
+    # Extract the cluster name from the server URL
+    cluster_name_from_url=$(echo "$server_url" | awk -F[/.] '{print $(NF-4)}')
+
+    # Map cluster name to context
+    cluster_context_map["$cluster_name_from_url"]="$context"
+
+    log "DEBUG" "Mapped cluster '$cluster_name_from_url' to context '$context'"
+done
+
 # Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
 while IFS=";" read -r CLSTRNM _CLSTRID; do
-    log "DEBUG" "Fetching kubectl cluster contents for ${CLSTRNM}"
+    log "DEBUG" "Processing cluster '${CLSTRNM}'"
+
+    # Get the context name for this cluster
+    context="${cluster_context_map[$CLSTRNM]}"
+
+    if [ -z "$context" ]; then
+        log "WARNING" "No matching context found for cluster '${CLSTRNM}', skipping..."
+        continue
+    fi
+
+    log "INFO" "Using context '$context' for cluster '${CLSTRNM}'"
 
     # Define file paths for saving cluster information
     CLSTR_PODS="${INFO_CACHE}/${CLSTRNM}_pods.json"
     CLSTR_INGRESS="${INFO_CACHE}/${CLSTRNM}_ingress.json"
 
-    if ! kubectl config get-contexts "${CLSTRNM}" &> /dev/null; then
-        log "WARNING" "No kube context found for cluster '${CLSTRNM}', skipping..."
-        continue
-    fi
-
-    if ! set_kube_context "${CLSTRNM}"; then
+    if ! set_kube_context "$context"; then
         log "ERROR" "Error setting kube context for cluster '${CLSTRNM}'"
         debug_crawler_error
         exit 1
@@ -171,7 +198,7 @@ if ! cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/"; then
     exit 1
 else
     log "INFO" "Ingress files copied successfully"
-fi
+    fi
 
 if ! cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
     log "ERROR" "Error copying pods files"
