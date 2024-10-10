@@ -41,10 +41,8 @@ collect_data:
     - echo "$fttc_pds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig
     - echo "$fttc_tf01_kubeconfig"   | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig
     - echo "$fttc_ts01_kubeconfig"   | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig
-
-    # For File Type Variables (content is base64-encoded)
-    - cat "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig
-    - cat "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig
+    - echo "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig
+    - echo "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig
 
     # Secure the kubeconfig files
     - chmod 600 /tmp/kubeconfigs/*
