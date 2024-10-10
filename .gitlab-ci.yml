@@ -1,8 +1,12 @@
 collect_data:
   stage: build
+  tags:
+    - my-runner-tag
   variables:
     GIT_SSL_NO_VERIFY: "true"
   script:
+
+    - echo "Running with specific runner"
     # Install dependencies
     - yum install -y epel-release
     - yum update -y && yum install -y curl jq git python3 python3-pip
