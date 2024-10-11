@@ -1,3 +1,4 @@
+
 #!/bin/bash
 set -e  # Exit immediately if a command exits with a non-zero status
 
@@ -159,8 +160,27 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 
     # Fetch data for the cluster
     echo "Fetching pod and ingress data for $CLSTRNM"
-    kubectl get pods -A -o json > "${INFO_CACHE}/${CLSTRNM}_pods.json" || { echo "Failed to get pod data for $CLSTRNM"; continue; }
-    kubectl get ingress -A -o json > "${INFO_CACHE}/${CLSTRNM}_ingress.json" || { echo "Failed to get ingress data for $CLSTRNM"; continue; }
+
+    # Add additional logging before writing files
+    PODS_FILE="${INFO_CACHE}/${CLSTRNM}_pods.json"
+    INGRESS_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.json"
+
+    kubectl get pods -A -o json > "$PODS_FILE" || { echo "Failed to get pod data for $CLSTRNM"; continue; }
+    kubectl get ingress -A -o json > "$INGRESS_FILE" || { echo "Failed to get ingress data for $CLSTRNM"; continue; }
+
+    # Check if the files are correctly written
+    if [ -f "$PODS_FILE" ]; then
+        echo "Pod data for $CLSTRNM successfully written to $PODS_FILE"
+    else
+        echo "Error: Pod data for $CLSTRNM not written to file"
+    fi
+
+    if [ -f "$INGRESS_FILE" ]; then
+        echo "Ingress data for $CLSTRNM successfully written to $INGRESS_FILE"
+    else
+        echo "Error: Ingress data for $CLSTRNM not written to file"
+    fi
+
 done < "${NAMEID_MAP}"
 
 # Show contents of the info cache directory
