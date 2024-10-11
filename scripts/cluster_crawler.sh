@@ -52,6 +52,7 @@ create_directory() {
 
 # Function to set the Kubernetes context for a given cluster
 set_kube_context() {
+    log "INFO" "Setting context for cluster $1"
     if kubectl config use-context "$1"; then
         log "INFO" "Successfully switched to context ${1}"
         return 0
@@ -146,38 +147,38 @@ done
 
 # Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
 while IFS=";" read -r CLSTRNM _CLSTRID; do
-    echo "Processing cluster: $CLSTRNM"
+    log "INFO" "Processing cluster: $CLSTRNM"
 
     context="${cluster_context_map[$CLSTRNM]}"
     if [ -z "$context" ]; then
-        echo "No matching context for cluster $CLSTRNM, skipping..."
+        log "WARNING" "No matching context for cluster $CLSTRNM, skipping..."
         continue
     fi
 
-    echo "Using context: $context for cluster: $CLSTRNM"
-    set_kube_context "$context" || { echo "Failed to switch to context $context"; continue; }
+    log "INFO" "Using context: $context for cluster: $CLSTRNM"
+    set_kube_context "$context" || { log "ERROR" "Failed to switch to context $context"; continue; }
 
     # Fetch data for the cluster
-    echo "Fetching pod and ingress data for $CLSTRNM"
+    log "INFO" "Fetching pod and ingress data for $CLSTRNM"
 
     # Add additional logging before writing files
     PODS_FILE="${INFO_CACHE}/${CLSTRNM}_pods.json"
     INGRESS_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.json"
 
-    kubectl get pods -A -o json > "$PODS_FILE" || { echo "Failed to get pod data for $CLSTRNM"; continue; }
-    kubectl get ingress -A -o json > "$INGRESS_FILE" || { echo "Failed to get ingress data for $CLSTRNM"; continue; }
+    kubectl get pods -A -o json > "$PODS_FILE" || { log "ERROR" "Failed to get pod data for $CLSTRNM"; continue; }
+    kubectl get ingress -A -o json > "$INGRESS_FILE" || { log "ERROR" "Failed to get ingress data for $CLSTRNM"; continue; }
 
     # Check if the files are correctly written
     if [ -f "$PODS_FILE" ]; then
-        echo "Pod data for $CLSTRNM successfully written to $PODS_FILE"
+        log "INFO" "Pod data for $CLSTRNM successfully written to $PODS_FILE"
     else
-        echo "Error: Pod data for $CLSTRNM not written to file"
+        log "ERROR" "Pod data for $CLSTRNM not written to file"
     fi
 
     if [ -f "$INGRESS_FILE" ]; then
-        echo "Ingress data for $CLSTRNM successfully written to $INGRESS_FILE"
+        log "INFO" "Ingress data for $CLSTRNM successfully written to $INGRESS_FILE"
     else
-        echo "Error: Ingress data for $CLSTRNM not written to file"
+        log "ERROR" "Ingress data for $CLSTRNM not written to file"
     fi
 
 done < "${NAMEID_MAP}"
