@@ -1,259 +1,124 @@
-#!/bin/bash
-set -e  # Exit immediately if a command exits with a non-zero status
+collect_data:
+  stage: build
+  image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
+  timeout: 60m  # Increase timeout to 60 minutes
+  variables:
+    GIT_SSL_NO_VERIFY: "true"
+  script:
+    # Display OS information
+    - echo "Displaying OS information"
+    - cat /etc/os-release || lsb_release -a || uname -a
 
-# Logging function with detailed or regular logging based on a flag
-log() {
-    local level="$1"
-    local message="$2"
-    if [ "$DETAILLIERTES_LOGGING" = true ]; then
-        echo "$level: $message"
-    elif [ "$level" != "DEBUG" ]; then
-        echo "$level: $message"
-    fi
-}
+    # Update package lists and install dependencies
+    - echo "Updating package lists and installing dependencies"
+    - apt-get update && apt-get install -y curl jq python3 python3-pip git || { echo "Error installing dependencies"; exit 1; }
 
-# Standard logging level is not detailed unless passed as an argument
-DETAILLIERTES_LOGGING=false
+    # Retry logic for kubectl download with retries, delay, timeout, and file size check
+    - |
+      KUBECTL_RETRIES=5
+      KUBECTL_DOWNLOAD_SUCCESS=false
+      KUBECTL_VERSION="v1.28.0"
+      KUBECTL_EXPECTED_SIZE=50000000  # Expected file size (adjust as needed)
 
-# Parse command-line arguments
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -dl) DETAILLIERTES_LOGGING=true ;;  # Enable detailed logging
-        *) echo "Unknown parameter passed: $1"; exit 1 ;;
-    esac
-    shift
-done
-
-# List of clusters
-UNSERE_CLUSTER="fttc ftctl"
-
-# Marker file to track if the script has already run successfully
-MARKER_FILE="$(dirname "$0")/cluster_crawler_marker"
-
-# Determine if FORCE_REBUILD should be set
-if [ -f "$MARKER_FILE" ]; then
-    FORCE_REBUILD=0
-else
-    FORCE_REBUILD=1
-fi
-
-# Function to create a directory if it doesn't exist
-create_directory() {
-    local locDir="${1}"
-    if [ ! -d "${locDir}" ]; then
-        mkdir -p "${locDir}" > /dev/null
-    fi
-    if [ ! -d "${locDir}" ]; then
-        log "ERROR" "Error creating directory '${locDir}'"
-        return 1
-    fi
-    return 0
-}
-
-# Function to set the Kubernetes context for a given cluster with retries
-set_kube_context() {
-    local RETRIES=3
-    log "INFO" "Setting context for cluster $1"
-    for ((i=1; i<=RETRIES; i++)); do
-        if kubectl config use-context "$1"; then
-            log "INFO" "Successfully switched to context ${1}"
-            return 0
+      for ((i=1; i<=KUBECTL_RETRIES; i++)); do
+        echo "Download attempt $i of $KUBECTL_RETRIES..."
+        if timeout 300 curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"; then
+          if [ $(stat -c%s "kubectl") -ge $KUBECTL_EXPECTED_SIZE ]; then
+            echo "kubectl download succeeded on attempt $i and verified file size."
+            KUBECTL_DOWNLOAD_SUCCESS=true
+            break
+          else
+            echo "kubectl download incomplete (wrong file size), retrying..."
+            rm -f kubectl
+          fi
         else
-            log "WARNING" "Error switching to context ${1}, attempt $i/$RETRIES"
-            sleep 5
+          echo "kubectl download failed on attempt $i. Retrying..."
+          sleep 10
         fi
-    done
-    log "ERROR" "Failed to switch to context ${1} after $RETRIES attempts"
-    return 1
-}
+      done
 
-# Temporary directory
-DAYSTAMP="$(date +"%Y%m%d")"
+      # Check if download succeeded
+      if [ "$KUBECTL_DOWNLOAD_SUCCESS" = false ]; then
+        echo "kubectl download failed after $KUBECTL_RETRIES attempts."
+        exit 1
+      fi
 
-# Set up the info cache directory
-INFO_CACHE="info_cache_${DAYSTAMP}"
+    # Make kubectl executable and move to bin
+    - chmod +x kubectl
+    - mv kubectl /usr/local/bin/kubectl || { echo "Error moving kubectl to /usr/local/bin"; exit 1; }
 
-if ! create_directory "${INFO_CACHE}"; then
-    exit 1
-fi
+    # Verify kubectl installation
+    - kubectl version --client || { echo "kubectl installation verification failed"; exit 1; }
 
-# Rebuild cache if needed
-if [ "${FORCE_REBUILD}" == "1" ]; then
-    log "INFO" "FORCE_REBUILD is set to 1, updating all cached cluster information"
-    rm -rf "${INFO_CACHE:?}"/* > /dev/null 2>&1 || true
-else
-    log "INFO" "FORCE_REBUILD is not set to 1, using cached cluster information"
-fi
+    # Install Python dependencies
+    - echo "Installing Python dependencies"
+    - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
 
-# Function for error logging and debugging
-debug_crawler_error() {
-    pwd
-    ls -al
-    ls -al "${INFO_CACHE}"
-}
+    # Create a temporary directory for kubeconfig files
+    - echo "Creating directory for kubeconfig files"
+    - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-# NAMEID Scraper: Retrieve and save name-ID mapping for all clusters
-NAMEID_MAP="scripts/docs/name_id.map"
-
-if [ -f "${NAMEID_MAP}" ]; then
-    log "INFO" "Static name_id.map file found. Using the file for cluster information."
-else
-    log "ERROR" "Static name_id.map file not found! Please check."
-    debug_crawler_error
-    exit 1
-fi
-
-# New section: Rename contexts in kubeconfig files to ensure uniqueness
-KUBECONFIGS_DIR="/tmp/kubeconfigs"
-
-# Check if the directory exists
-if [ -d "$KUBECONFIGS_DIR" ]; then
-    log "INFO" "Renaming contexts in kubeconfig files to ensure uniqueness"
-
-    for file in "$KUBECONFIGS_DIR"/*; do
-        cluster_name=$(basename "$file" | sed 's/_kubeconfig//' | tr '_' '-')
-        echo "Processing file $file with cluster name $cluster_name"
-        export KUBECONFIG="$file"
-        current_context=$(kubectl config current-context)
-        echo "Current context is '$current_context'"
-        if [ "$current_context" != "$cluster_name" ]; then
-            kubectl config rename-context "$current_context" "$cluster_name" || { echo "Error renaming context for $cluster_name"; exit 1; }
-            echo "Renamed context '$current_context' to '$cluster_name'"
+    # Check if kubeconfig variables are set with logging
+    - |
+      echo "Checking if kubeconfig variables are set"
+      for var in ftctl_pf01_kubeconfig ftctl_ps01_kubeconfig fttc_pdf01_kubeconfig fttc_pds01_kubeconfig fttc_tdf01_kubeconfig fttc_tds01_kubeconfig fttc_tf01_kubeconfig fttc_ts01_kubeconfig; do
+        echo "Checking variable: $var"
+        if [ -z "${!var}" ]; then
+          echo "Variable $var is NOT set or is empty"
+        else
+          echo "Variable $var is set to: ${!var}"
         fi
-    done
+      done
 
-    # Merge all kubeconfig files into a single file
-    echo "Merging kubeconfig files:"
-    export KUBECONFIG=$(find "$KUBECONFIGS_DIR" -type f -exec printf '{}:' \;)
-    kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
+    # Write each kubeconfig variable to a file with logging
+    - echo "Writing kubeconfig variables to files"
+    - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
+    - echo "$ftctl_ps01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig || { echo "Error decoding kubeconfig ftctl_ps01"; exit 1; }
+    - echo "$fttc_pdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig || { echo "Error decoding kubeconfig fttc_pdf01"; exit 1; }
+    - echo "$fttc_pds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig || { echo "Error decoding kubeconfig fttc_pds01"; exit 1; }
+    - echo "$fttc_tf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig || { echo "Error decoding kubeconfig fttc_tf01"; exit 1; }
+    - echo "$fttc_ts01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig || { echo "Error decoding kubeconfig fttc_ts01"; exit 1; }
+    - echo "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig || { echo "Error decoding kubeconfig fttc_tdf01"; exit 1; }
+    - echo "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig || { echo "Error decoding kubeconfig fttc_tds01"; exit 1; }
 
-    # Verify contexts after merging
-    echo "Available contexts after merging kubeconfig files:"
-    kubectl config get-contexts || { echo "Error retrieving contexts from merged kubeconfig"; exit 1; }
+    # Secure the kubeconfig files
+    - echo "Securing kubeconfig files"
+    - chmod 600 /tmp/kubeconfigs/* || { echo "Error securing kubeconfig files"; exit 1; }
 
-else
-    echo "Kubeconfig directory not found!"
-    exit 1
-fi
+    # Verify the contents of kubeconfig files
+    - echo "Verifying the contents of kubeconfig files"
+    - for file in /tmp/kubeconfigs/*; do
+        echo "Contents of $file:";
+        head -n 5 "$file" || { echo "Error reading file $file"; exit 1; }
+      done
 
-# Build a mapping from cluster names to context names
-log "INFO" "Building cluster to context mapping"
+    # Verify kubeconfig files exist before merging
+    - echo "Verifying kubeconfig files exist before merging"
+    - ls -1 /tmp/kubeconfigs/* || { echo "No kubeconfig files found"; exit 1; }
 
-declare -A cluster_context_map
+    # Merge the kubeconfig files
+    - echo "Merging the kubeconfig files"
+    - export KUBECONFIG=$(ls -1 /tmp/kubeconfigs/* | tr '\n' ':') || { echo "Error merging kubeconfigs"; exit 1; }
+    - kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
 
-available_contexts=$(kubectl config get-contexts -o name)
+    # Use the merged kubeconfig
+    - echo "Using the merged kubeconfig"
+    - export KUBECONFIG=/tmp/merged_kubeconfig
 
-for context in $available_contexts; do
-    cluster_info=$(kubectl config view -o jsonpath="{.contexts[?(@.name=='$context')].context.cluster}")
-    cluster_name_from_context="$context"
-    cluster_context_map["$cluster_name_from_context"]="$context"
-    log "DEBUG" "Mapped cluster '$cluster_name_from_context' to context '$context'"
-done
+    # Verify the contexts in the merged kubeconfig
+    - echo "Verifying the contexts in merged kubeconfig"
+    - kubectl config get-contexts || { echo "Error getting contexts"; exit 1; }
 
-# Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
-while IFS=";" read -r CLSTRNM _CLSTRID; do
-    log "INFO" "Processing cluster: $CLSTRNM"
+    # Ensure scripts are executable
+    - echo "Ensuring scripts are executable"
+    - chmod +x scripts/cluster_crawler.sh
+    - chmod +x scripts/parser.py
 
-    context="${cluster_context_map[$CLSTRNM]}"
-    if [ -z "$context" ]; then
-        log "WARNING" "No matching context for cluster $CLSTRNM, skipping..."
-        continue
-    fi
+    # Run the cluster crawler script
+    - echo "Running cluster crawler script"
+    - ./scripts/cluster_crawler.sh || { echo "Cluster crawler script failed"; exit 1; }
 
-    log "INFO" "Using context: $context for cluster: $CLSTRNM"
-    set_kube_context "$context" || { log "ERROR" "Failed to switch to context $context"; continue; }
-
-    # Fetch data for the cluster
-    log "INFO" "Fetching pod and ingress data for $CLSTRNM"
-
-    PODS_FILE="${INFO_CACHE}/${CLSTRNM}_pods.json"
-    INGRESS_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.json"
-
-    kubectl get pods -A -o json > "$PODS_FILE" || { log "ERROR" "Failed to get pod data for $CLSTRNM"; continue; }
-    kubectl get ingress -A -o json > "$INGRESS_FILE" || { log "ERROR" "Failed to get ingress data for $CLSTRNM"; continue; }
-
-    # Check if the files are correctly written
-    if [ -f "$PODS_FILE" ]; then
-        log "INFO" "Pod data for $CLSTRNM successfully written to $PODS_FILE"
-    else
-        log "ERROR" "Pod data for $CLSTRNM not written to file"
-    fi
-
-    if [ -f "$INGRESS_FILE" ]; then
-        log "INFO" "Ingress data for $CLSTRNM successfully written to $INGRESS_FILE"
-    else
-        log "ERROR" "Ingress data for $CLSTRNM not written to file"
-    fi
-
-done < "${NAMEID_MAP}"
-
-# Show contents of the info cache directory
-log "INFO" "Contents of directory ${INFO_CACHE}:"
-ls -l "${INFO_CACHE}"
-
-# Define the path to the Python script
-PYTHON_PARSER_PATH="scripts/parser.py"
-INPUT_DIR="${INFO_CACHE}"
-OUTPUT_DIR="${INFO_CACHE}"
-
-# Run the Python parser
-python3 "$PYTHON_PARSER_PATH" -dl --input_dir "$INPUT_DIR" --output_dir "$OUTPUT_DIR"
-
-# Git token and repository configuration
-GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
-
-echo "oauth: '[MASKED]'"
-
-# Clone the repository into a temporary directory
-REPO_DIR="/tmp/docs-repo"
-if [ ! -d "${REPO_DIR}" ]; then
-    git clone "${GIT_REPO_URL}" "${REPO_DIR}"
-else
-    cd "${REPO_DIR}" || exit
-    git pull origin main
-    cd - || exit
-fi
-
-# Set paths within the repository
-INGRESS_PATH="${REPO_DIR}/boms/k8s/ingress"
-PODS_PATH="${REPO_DIR}/boms/k8s/pods"
-
-# Create target directories in the repository
-create_directory "${INGRESS_PATH}"
-create_directory "${PODS_PATH}"
-
-# Copy the new data into the repository directory
-if ! cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/"; then
-    log "ERROR" "Error copying ingress files"
-    exit 1
-else
-    log "INFO" "Ingress files copied successfully"
-fi
-
-if ! cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
-    log "ERROR" "Error copying pods files"
-    exit 1
-else
-    log "INFO" "Pods files copied successfully"
-fi
-
-# Configure Git with a generic user
-cd "${REPO_DIR}" || exit
-git config user.email "ci@f-i-ts.de"
-git config user.name "Cluster Crawler"
-
-# Pull the latest changes
-git pull origin main
-
-# Stage all changes
-git add -A
-
-# Commit and push if there are changes
-if ! git diff --cached --quiet; then
-    git commit -m "Automatisches Update der Cluster-Daten am $(date)"
-    git push origin main
-else
-    echo "No changes to commit."
-fi
-exit 0
-        
+    # Clean up temporary files
+    - echo "Cleaning up temporary files"
+    - rm -rf /tmp/kubeconfigs || { echo "Error cleaning kubeconfigs"; exit 1; }
+    - rm -f /tmp/merged_kubeconfig || { echo "Error cleaning merged kubeconfig"; exit 1; }
