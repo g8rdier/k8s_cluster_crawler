@@ -13,13 +13,37 @@ collect_data:
     - echo "Updating package lists and installing dependencies"
     - apt-get update && apt-get install -y curl jq python3 python3-pip git || { echo "Error installing dependencies"; exit 1; }
 
-    # Install kubectl
-    - echo "Installing kubectl"
+    # Retry logic for kubectl download with timeout
+    - echo "Downloading kubectl with retries"
+    - KUBECTL_RETRIES=3
+    - KUBECTL_DOWNLOAD_SUCCESS=false
     - KUBECTL_VERSION="v1.28.0"
-    - curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" || { echo "Error downloading kubectl"; exit 1; }
+
+    # Download kubectl with retry logic and timeout
+    - for ((i=1; i<=KUBECTL_RETRIES; i++)); do
+        echo "Download attempt $i of $KUBECTL_RETRIES..."
+        if timeout 300 curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"; then
+          echo "kubectl download succeeded on attempt $i."
+          KUBECTL_DOWNLOAD_SUCCESS=true
+          break
+        else
+          echo "kubectl download failed on attempt $i. Retrying..."
+          sleep 10
+        fi
+      done
+
+    # Check if download succeeded
+    - if [ "$KUBECTL_DOWNLOAD_SUCCESS" = false ]; then
+        echo "kubectl download failed after $KUBECTL_RETRIES attempts."
+        exit 1
+      fi
+
+    # Make kubectl executable and move to bin
     - chmod +x kubectl
-    - mv kubectl /usr/local/bin/kubectl
-    - kubectl version --client || { echo "Error verifying kubectl installation"; exit 1; }
+    - mv kubectl /usr/local/bin/kubectl || { echo "Error moving kubectl to /usr/local/bin"; exit 1; }
+
+    # Verify kubectl installation
+    - kubectl version --client || { echo "kubectl installation verification failed"; exit 1; }
 
     # Install Python dependencies
     - echo "Installing Python dependencies"
@@ -43,6 +67,13 @@ collect_data:
     # Write each kubeconfig variable to a file
     - echo "Writing kubeconfig variables to files"
     - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
+    - echo "$ftctl_ps01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig || { echo "Error decoding kubeconfig ftctl_ps01"; exit 1; }
+    - echo "$fttc_pdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig || { echo "Error decoding kubeconfig fttc_pdf01"; exit 1; }
+    - echo "$fttc_pds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig || { echo "Error decoding kubeconfig fttc_pds01"; exit 1; }
+    - echo "$fttc_tf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig || { echo "Error decoding kubeconfig fttc_tf01"; exit 1; }
+    - echo "$fttc_ts01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig || { echo "Error decoding kubeconfig fttc_ts01"; exit 1; }
+    - echo "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig || { echo "Error decoding kubeconfig fttc_tdf01"; exit 1; }
+    - echo "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig || { echo "Error decoding kubeconfig fttc_tds01"; exit 1; }
 
     # Secure the kubeconfig files
     - echo "Securing kubeconfig files"
