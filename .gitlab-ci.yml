@@ -20,7 +20,8 @@ collect_data:
     - KUBECTL_VERSION="v1.28.0"
 
     # Download kubectl with retry logic and timeout
-    - for ((i=1; i<=KUBECTL_RETRIES; i++)); do
+    - |
+      for ((i=1; i<=KUBECTL_RETRIES; i++)); do
         echo "Download attempt $i of $KUBECTL_RETRIES..."
         if timeout 300 curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"; then
           echo "kubectl download succeeded on attempt $i."
@@ -33,7 +34,8 @@ collect_data:
       done
 
     # Check if download succeeded
-    - if [ "$KUBECTL_DOWNLOAD_SUCCESS" = false ]; then
+    - |
+      if [ "$KUBECTL_DOWNLOAD_SUCCESS" = false ]; then
         echo "kubectl download failed after $KUBECTL_RETRIES attempts."
         exit 1
       fi
