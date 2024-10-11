@@ -56,7 +56,7 @@ collect_data:
     # Check if kubeconfig variables are set with logging
     - echo "Checking if kubeconfig variables are set"
     - for var in ftctl_pf01_kubeconfig ftctl_ps01_kubeconfig fttc_pdf01_kubeconfig fttc_pds01_kubeconfig fttc_tdf01_kubeconfig fttc_tds01_kubeconfig fttc_tf01_kubeconfig fttc_ts01_kubeconfig; do
-        echo "Checking variable: $var";
+           echo "Checking variable: $var";
         if [ -z "${!var}" ]; then
           echo "Variable $var is NOT set or is empty";
         else
