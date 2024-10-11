@@ -50,16 +50,21 @@ create_directory() {
     return 0
 }
 
-# Function to set the Kubernetes context for a given cluster
+# Function to set the Kubernetes context for a given cluster with retries
 set_kube_context() {
+    local RETRIES=3
     log "INFO" "Setting context for cluster $1"
-    if kubectl config use-context "$1"; then
-        log "INFO" "Successfully switched to context ${1}"
-        return 0
-    else
-        log "ERROR" "Error switching to context ${1}"
-        return 1
-    fi
+    for ((i=1; i<=RETRIES; i++)); do
+        if kubectl config use-context "$1"; then
+            log "INFO" "Successfully switched to context ${1}"
+            return 0
+        else
+            log "WARNING" "Error switching to context ${1}, attempt $i/$RETRIES"
+            sleep 5
+        fi
+    done
+    log "ERROR" "Failed to switch to context ${1} after $RETRIES attempts"
+    return 1
 }
 
 # Temporary directory
@@ -161,7 +166,6 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     # Fetch data for the cluster
     log "INFO" "Fetching pod and ingress data for $CLSTRNM"
 
-    # Add additional logging before writing files
     PODS_FILE="${INFO_CACHE}/${CLSTRNM}_pods.json"
     INGRESS_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.json"
 
@@ -252,3 +256,4 @@ else
     echo "No changes to commit."
 fi
 exit 0
+        
