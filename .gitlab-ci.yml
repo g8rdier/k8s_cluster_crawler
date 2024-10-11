@@ -14,7 +14,6 @@ collect_data:
     - apt-get update && apt-get install -y curl jq python3 python3-pip git || { echo "Error installing dependencies"; exit 1; }
 
     # Retry logic for kubectl download with timeout
-    - echo "Downloading kubectl with retries"
     - |
       KUBECTL_RETRIES=3
       KUBECTL_DOWNLOAD_SUCCESS=false
@@ -54,13 +53,14 @@ collect_data:
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
     # Check if kubeconfig variables are set with logging
-    - echo "Checking if kubeconfig variables are set"
-    - for var in ftctl_pf01_kubeconfig ftctl_ps01_kubeconfig fttc_pdf01_kubeconfig fttc_pds01_kubeconfig fttc_tdf01_kubeconfig fttc_tds01_kubeconfig fttc_tf01_kubeconfig fttc_ts01_kubeconfig; do
-           echo "Checking variable: $var";
+    - |
+      echo "Checking if kubeconfig variables are set"
+      for var in ftctl_pf01_kubeconfig ftctl_ps01_kubeconfig fttc_pdf01_kubeconfig fttc_pds01_kubeconfig fttc_tdf01_kubeconfig fttc_tds01_kubeconfig fttc_tf01_kubeconfig fttc_ts01_kubeconfig; do
+        echo "Checking variable: $var"
         if [ -z "${!var}" ]; then
-          echo "Variable $var is NOT set or is empty";
+          echo "Variable $var is NOT set or is empty"
         else
-          echo "Variable $var is set to: ${!var}";
+          echo "Variable $var is set to: ${!var}"
         fi
       done
 
