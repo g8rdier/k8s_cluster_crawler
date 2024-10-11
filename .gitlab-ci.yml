@@ -53,18 +53,18 @@ collect_data:
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Check if kubeconfig variables are set
+    # Check if kubeconfig variables are set with logging
     - echo "Checking if kubeconfig variables are set"
     - for var in ftctl_pf01_kubeconfig ftctl_ps01_kubeconfig fttc_pdf01_kubeconfig fttc_pds01_kubeconfig fttc_tdf01_kubeconfig fttc_tds01_kubeconfig fttc_tf01_kubeconfig fttc_ts01_kubeconfig; do
-        echo "Checking if $var is set";
+        echo "Checking variable: $var";
         if [ -z "${!var}" ]; then
           echo "Variable $var is NOT set or is empty";
         else
-          echo "Variable $var is set";
+          echo "Variable $var is set to: ${!var}";
         fi
       done
 
-    # Write each kubeconfig variable to a file
+    # Write each kubeconfig variable to a file with logging
     - echo "Writing kubeconfig variables to files"
     - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
     - echo "$ftctl_ps01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig || { echo "Error decoding kubeconfig ftctl_ps01"; exit 1; }
@@ -85,6 +85,10 @@ collect_data:
         echo "Contents of $file:";
         head -n 5 "$file" || { echo "Error reading file $file"; exit 1; }
       done
+
+    # Verify kubeconfig files exist before merging
+    - echo "Verifying kubeconfig files exist before merging"
+    - ls -1 /tmp/kubeconfigs/* || { echo "No kubeconfig files found"; exit 1; }
 
     # Merge the kubeconfig files
     - echo "Merging the kubeconfig files"
