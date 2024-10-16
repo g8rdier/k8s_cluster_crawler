@@ -93,15 +93,15 @@ collect_data:
       done
 
     # Verify kubeconfig files exist before merging
-    - echo "Verifying kubeconfig files exist before merging"
-      for file in /tmp/kubeconfigs/*; do
+    -  echo "Verifying kubeconfig files exist before merging"
+       for file in /tmp/kubeconfigs/*; do
         if [ ! -f "$file" ]; then
-            echo "Error: $file does not exist"
-            exit 1
+        echo "Error: $file does not exist"
+        exit 1
         else
-            echo "Verified existence of $file"
+        echo "Verified existence of $file"
         fi
-      done
+        done
 
     # Merge the kubeconfig files
     - echo "Merging the kubeconfig files"
