@@ -50,13 +50,24 @@ create_directory() {
     return 0
 }
 
-# Function to set the Kubernetes context for a given cluster with retries
+# Function to set the Kubernetes context for a given cluster with retries and checks
 set_kube_context() {
     local RETRIES=3
     log "INFO" "Setting context for cluster $1"
+    
+    # Pre-check: Show the current context before attempting to switch
+    local current_context
+    current_context=$(kubectl config current-context)
+    log "INFO" "Pre-switch: Current context is '${current_context}'"
+    
     for ((i=1; i<=RETRIES; i++)); do
         if kubectl config use-context "$1"; then
             log "INFO" "Successfully switched to context ${1}"
+            
+            # Post-check: Verify that the context was successfully switched
+            current_context=$(kubectl config current-context)
+            log "INFO" "Post-switch: Current context is '${current_context}'"
+            
             return 0
         else
             log "WARNING" "Error switching to context ${1}, attempt $i/$RETRIES"
@@ -106,7 +117,6 @@ fi
 # New section: Rename contexts in kubeconfig files to ensure uniqueness
 KUBECONFIGS_DIR="/tmp/kubeconfigs"
 
-# Check if the directory exists
 if [ -d "$KUBECONFIGS_DIR" ]; then
     log "INFO" "Renaming contexts in kubeconfig files to ensure uniqueness"
 
@@ -256,4 +266,3 @@ else
     echo "No changes to commit."
 fi
 exit 0
-        
