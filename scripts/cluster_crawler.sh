@@ -55,43 +55,22 @@ set_kube_context() {
     local cluster="$1"
     local RETRIES=3
     log "INFO" "Setting context for cluster $cluster"
-    
-    # Check for available contexts and use the first if no current-context is set
+
+    # Output available contexts and current context before the switch
+    log "INFO" "Available contexts before switch:"
+    kubectl config get-contexts || { log "ERROR" "Failed to get contexts"; exit 1; }
     current_context=$(kubectl config current-context 2>/dev/null || true)
+    log "INFO" "Current context before switch: '${current_context}'"
 
-    if [ -z "$current_context" ]; then
-        log "WARNING" "No current context found, trying to set one for cluster $cluster"
-        available_contexts=$(kubectl config get-contexts -o name)
-        if [ -z "$available_contexts" ]; then
-            log "ERROR" "No contexts available in kubeconfig for $cluster"
-            return 1
-        else
-            log "INFO" "Using first available context for $cluster: $available_contexts"
-            kubectl config use-context "$(echo "$available_contexts" | head -n 1)" || { log "ERROR" "Error setting context for $cluster"; exit 1; }
-        fi
-    fi
-
-     # Retry logic for switching to the desired context
+    # Retry logic for switching to the desired context
     for ((i=1; i<=RETRIES; i++)); do
         if kubectl config use-context "$cluster"; then
             log "INFO" "Successfully switched to context ${cluster}"
+            # Output available contexts and current context after the switch
+            log "INFO" "Available contexts after switch:"
+            kubectl config get-contexts || { log "ERROR" "Failed to get contexts"; exit 1; }
             current_context=$(kubectl config current-context)
-            log "INFO" "Post-switch: Current context is '${current_context}'"
-            return 0
-        else
-            log "WARNING" "Error switching to context ${cluster}, attempt $i/$RETRIES"
-            sleep 5
-        fi
-    done
-    log "ERROR" "Failed to switch to context ${cluster} after $RETRIES attempts"
-    return 1
-    
-    # Attempt to switch context
-    for ((i=1; i<=RETRIES; i++)); do
-        if kubectl config use-context "$cluster"; then
-            log "INFO" "Successfully switched to context ${cluster}"
-            current_context=$(kubectl config current-context)
-            log "INFO" "Post-switch: Current context is '${current_context}'"
+            log "INFO" "Current context after switch: '${current_context}'"
             return 0
         else
             log "WARNING" "Error switching to context ${cluster}, attempt $i/$RETRIES"
@@ -269,7 +248,7 @@ if ! cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
     exit 1
 else
     log "INFO" "Pods files copied successfully"
-fi
+    fi
 
 # Configure Git with a generic user
 cd "${REPO_DIR}" || exit
