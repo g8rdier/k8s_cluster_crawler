@@ -5,11 +5,11 @@ collect_data:
   variables:
     GIT_SSL_NO_VERIFY: "true"
   script:
-    # Display OS information
+    # Display OS information (non-sensitive)
     - echo "Displaying OS information"
     - cat /etc/os-release || lsb_release -a || uname -a
 
-    # Update package lists and install dependencies
+    # Update package lists and install dependencies (non-sensitive)
     - apt-get update && apt-get install -y curl jq python3 python3-pip git || { echo "Error installing dependencies"; exit 1; }
 
     # Retry logic for kubectl download with retries, delay, timeout, and file size check
@@ -49,7 +49,6 @@ collect_data:
     # Verify kubectl installation
     - kubectl version --client || { echo "kubectl installation verification failed"; exit 1; }
 
-
     # Install Python dependencies
     - echo "Installing Python dependencies"
     - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
@@ -58,19 +57,7 @@ collect_data:
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Check if kubeconfig variables are set with logging
-    - |
-      echo "Checking if kubeconfig variables are set"
-      for var in ftctl_pf01_kubeconfig ftctl_ps01_kubeconfig fttc_pdf01_kubeconfig fttc_pds01_kubeconfig fttc_tdf01_kubeconfig fttc_tds01_kubeconfig fttc_tf01_kubeconfig fttc_ts01_kubeconfig; do
-        echo "Checking variable: $var"
-        if [ -z "${!var}" ]; then
-          echo "Variable $var is NOT set or is empty"
-        else
-          echo "Variable $var is set to: ${!var}"
-        fi
-      done
-
-      # Write each kubeconfig variable to a file without logging sensitive data
+    # Write each kubeconfig variable to a file without logging sensitive data
     - echo "Writing kubeconfig variables to files"
     - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
     - echo "$ftctl_ps01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig || { echo "Error decoding kubeconfig ftctl_ps01"; exit 1; }
@@ -85,25 +72,18 @@ collect_data:
     - echo "Securing kubeconfig files"
     - chmod 600 /tmp/kubeconfigs/* || { echo "Error securing kubeconfig files"; exit 1; }
 
-    # Verify the contents of kubeconfig files
-    - echo "Verifying the contents of kubeconfig files"
+    # Verify that kubeconfig files exist without exposing contents
+    - echo "Verifying kubeconfig files exist"
     - for file in /tmp/kubeconfigs/*; do
-        echo "Contents of $file:";
-        head -n 5 "$file" || { echo "Error reading file $file"; exit 1; }
+        if [ ! -f "$file" ]; then
+            echo "Error: $file does not exist"
+            exit 1
+        else
+            echo "Verified existence of $file"
+        fi
       done
 
-    # Verify kubeconfig files exist before merging
-    -  echo "Verifying kubeconfig files exist before merging"
-       for file in /tmp/kubeconfigs/*; do
-        if [ ! -f "$file" ]; then
-        echo "Error: $file does not exist"
-        exit 1
-        else
-        echo "Verified existence of $file"
-        fi
-        done
-
-    # Merge the kubeconfig files
+    # Merge the kubeconfig files without exposing the contents
     - echo "Merging the kubeconfig files"
     - export KUBECONFIG=$(ls -1 /tmp/kubeconfigs/* | tr '\n' ':') || { echo "Error merging kubeconfigs"; exit 1; }
     - kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
