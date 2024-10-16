@@ -52,29 +52,38 @@ create_directory() {
 
 # Function to set the Kubernetes context for a given cluster with retries and checks
 set_kube_context() {
+    local cluster="$1"
     local RETRIES=3
-    log "INFO" "Setting context for cluster $1"
+    log "INFO" "Setting context for cluster $cluster"
     
-    # Pre-check: Show the current context before attempting to switch
-    local current_context
-    current_context=$(kubectl config current-context)
-    log "INFO" "Pre-switch: Current context is '${current_context}'"
+    # Check for available contexts and use the first if no current-context is set
+    current_context=$(kubectl config current-context 2>/dev/null || true)
+
+    if [ -z "$current_context" ]; then
+        log "WARNING" "No current context found, trying to set one for cluster $cluster"
+        available_contexts=$(kubectl config get-contexts -o name)
+        if [ -z "$available_contexts" ]; then
+            log "ERROR" "No contexts available in kubeconfig for $cluster"
+            return 1
+        else
+            log "INFO" "Using first available context for $cluster: $available_contexts"
+            kubectl config use-context "$(echo "$available_contexts" | head -n 1)" || { log "ERROR" "Error setting context for $cluster"; exit 1; }
+        fi
+    fi
     
+    # Attempt to switch context
     for ((i=1; i<=RETRIES; i++)); do
-        if kubectl config use-context "$1"; then
-            log "INFO" "Successfully switched to context ${1}"
-            
-            # Post-check: Verify that the context was successfully switched
+        if kubectl config use-context "$cluster"; then
+            log "INFO" "Successfully switched to context ${cluster}"
             current_context=$(kubectl config current-context)
             log "INFO" "Post-switch: Current context is '${current_context}'"
-            
             return 0
         else
-            log "WARNING" "Error switching to context ${1}, attempt $i/$RETRIES"
+            log "WARNING" "Error switching to context ${cluster}, attempt $i/$RETRIES"
             sleep 5
         fi
     done
-    log "ERROR" "Failed to switch to context ${1} after $RETRIES attempts"
+    log "ERROR" "Failed to switch to context ${cluster} after $RETRIES attempts"
     return 1
 }
 
