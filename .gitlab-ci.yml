@@ -69,12 +69,13 @@ collect_data:
 
     # Verify that kubeconfig files exist without exposing contents
     - echo "Verifying kubeconfig files exist"
-    - for file in /tmp/kubeconfigs/*; do
+    - |
+      for file in /tmp/kubeconfigs/*; do
         if [ ! -f "$file" ]; then
-            echo "Error\: $file does not exist"
-            exit 1
+          echo "Error: $file does not exist"
+          exit 1
         else
-            echo "Verified existence of $file"
+          echo "Verified existence of $file"
         fi
       done
 
