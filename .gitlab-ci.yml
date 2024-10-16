@@ -72,11 +72,10 @@ collect_data:
 
     # Write each kubeconfig variable to a file with logging
     - echo "Writing kubeconfig variables to files"
-    - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
-    - echo "$ftctl_ps01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig || { echo "Error decoding kubeconfig ftctl_ps01"; exit 1; }
-    - echo "$fttc_pdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig || { echo "Error decoding kubeconfig fttc_pdf01"; exit 1; }
-    - echo "$fttc_pds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig || { echo "Error decoding kubeconfig fttc_pds01"; exit 1; }
-    - echo "$fttc_tf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig || { echo "Error decoding kubeconfig 
+    - base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
+    - base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig || { echo "Error decoding kubeconfig ftctl_ps01"; exit 1; }
+    - base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig || { echo "Error decoding kubeconfig fttc_pdf01"; exit 1; }
+    - base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig || { echo "Error decoding kubeconfig fttc_pds01"; exit 1; }
 
     # Secure the kubeconfig files
     - echo "Securing kubeconfig files"
