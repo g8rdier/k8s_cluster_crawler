@@ -70,8 +70,8 @@ collect_data:
     # Verify the contents of kubeconfig files without exposing contents in logs
     - echo "Verifying the contents of kubeconfig files"
       for file in /tmp/kubeconfigs/*; do
-        echo "Verifying file: $file"
-        if [ ! -f "$file" ]; then
+        echo "Verifying file: $for_file"
+        if [ ! -f "$for_file" ]; then
           echo "Error: $file does not exist"
           exit 1
         fi
