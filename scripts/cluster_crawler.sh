@@ -70,6 +70,21 @@ set_kube_context() {
             kubectl config use-context "$(echo "$available_contexts" | head -n 1)" || { log "ERROR" "Error setting context for $cluster"; exit 1; }
         fi
     fi
+
+     # Retry logic for switching to the desired context
+    for ((i=1; i<=RETRIES; i++)); do
+        if kubectl config use-context "$cluster"; then
+            log "INFO" "Successfully switched to context ${cluster}"
+            current_context=$(kubectl config current-context)
+            log "INFO" "Post-switch: Current context is '${current_context}'"
+            return 0
+        else
+            log "WARNING" "Error switching to context ${cluster}, attempt $i/$RETRIES"
+            sleep 5
+        fi
+    done
+    log "ERROR" "Failed to switch to context ${cluster} after $RETRIES attempts"
+    return 1
     
     # Attempt to switch context
     for ((i=1; i<=RETRIES; i++)); do
