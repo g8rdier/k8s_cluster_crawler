@@ -13,24 +13,31 @@ collect_data:
     - echo "Updating package lists and installing dependencies"
     - apt-get update && apt-get install -y curl jq python3 python3-pip git || { echo "Error installing dependencies"; exit 1; }
 
-    # Retry logic for kubectl download with extended timeout
+    # Retry logic for kubectl download with retries, delay, timeout, and file size check
     - |
       KUBECTL_RETRIES=5
       KUBECTL_DOWNLOAD_SUCCESS=false
       KUBECTL_VERSION="v1.28.0"
+      KUBECTL_EXPECTED_SIZE=50000000  # Expected file size (adjust as needed)
 
       for ((i=1; i<=KUBECTL_RETRIES; i++)); do
         echo "Download attempt $i of $KUBECTL_RETRIES..."
-        if timeout 600 curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"; then
-          echo "kubectl download succeeded on attempt $i."
-          KUBECTL_DOWNLOAD_SUCCESS=true
-          break
+        if timeout 300 curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"; then
+          if [ $(stat -c%s "kubectl") -ge $KUBECTL_EXPECTED_SIZE ]; then
+            echo "kubectl download succeeded on attempt $i and verified file size."
+            KUBECTL_DOWNLOAD_SUCCESS=true
+            break
+          else
+            echo "kubectl download incomplete (wrong file size), retrying..."
+            rm -f kubectl
+          fi
         else
-          echo "kubectl download failed on attempt $i. Retrying in 30 seconds..."
-          sleep 30
+          echo "kubectl download failed on attempt $i. Retrying..."
+          sleep 10
         fi
       done
 
+      # Check if download succeeded
       if [ "$KUBECTL_DOWNLOAD_SUCCESS" = false ]; then
         echo "kubectl download failed after $KUBECTL_RETRIES attempts."
         exit 1
