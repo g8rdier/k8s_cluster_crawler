@@ -1,7 +1,7 @@
 collect_data:
   stage: build
   image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
-  timeout: 60m  # Increase timeout to 60 minutes
+  timeout: 60m
   variables:
     GIT_SSL_NO_VERIFY: "true"
   script:
@@ -10,7 +10,6 @@ collect_data:
     - cat /etc/os-release || lsb_release -a || uname -a
 
     # Update package lists and install dependencies
-    - echo "Updating package lists and installing dependencies"
     - apt-get update && apt-get install -y curl jq python3 python3-pip git || { echo "Error installing dependencies"; exit 1; }
 
     # Retry logic for kubectl download with retries, delay, timeout, and file size check
@@ -18,7 +17,7 @@ collect_data:
       KUBECTL_RETRIES=5
       KUBECTL_DOWNLOAD_SUCCESS=false
       KUBECTL_VERSION="v1.28.0"
-      KUBECTL_EXPECTED_SIZE=50000000  # Expected file size (adjust as needed)
+      KUBECTL_EXPECTED_SIZE=49836544  # Correct file size in bytes
 
       for ((i=1; i<=KUBECTL_RETRIES; i++)); do
         echo "Download attempt $i of $KUBECTL_RETRIES..."
@@ -49,6 +48,7 @@ collect_data:
 
     # Verify kubectl installation
     - kubectl version --client || { echo "kubectl installation verification failed"; exit 1; }
+
 
     # Install Python dependencies
     - echo "Installing Python dependencies"
