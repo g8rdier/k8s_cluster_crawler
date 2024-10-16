@@ -49,7 +49,6 @@ collect_data:
     # Verify kubectl installation
     - kubectl version --client || { echo "kubectl installation verification failed"; exit 1; }
 
-
     # Install Python dependencies
     - echo "Installing Python dependencies"
     - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
@@ -58,34 +57,24 @@ collect_data:
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Check if kubeconfig variables are set with logging
-    - |
-      echo "Checking if kubeconfig variables are set"
-      for var in ftctl_pf01_kubeconfig ftctl_ps01_kubeconfig fttc_pdf01_kubeconfig fttc_pds01_kubeconfig fttc_tdf01_kubeconfig fttc_tds01_kubeconfig fttc_tf01_kubeconfig fttc_ts01_kubeconfig; do
-        echo "Checking variable: $var"
-        if [ -z "${!var}" ]; then
-          echo "Variable $var is NOT set or is empty"
-        else
-          echo "Variable $var is set to: ${!var}"
-        fi
-      done
-
-    # Write each kubeconfig variable to a file with logging
+    # Write each kubeconfig variable to a file securely (without logging sensitive data)
     - echo "Writing kubeconfig variables to files"
-    - base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
-    - base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig || { echo "Error decoding kubeconfig ftctl_ps01"; exit 1; }
-    - base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig || { echo "Error decoding kubeconfig fttc_pdf01"; exit 1; }
-    - base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig || { echo "Error decoding kubeconfig fttc_pds01"; exit 1; }
+    - echo "$ftctl_pf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_pf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
+    - echo "$ftctl_ps01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/ftctl_ps01_kubeconfig || { echo "Error decoding kubeconfig ftctl_ps01"; exit 1; }
+    - echo "$fttc_pdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pdf01_kubeconfig || { echo "Error decoding kubeconfig fttc_pdf01"; exit 1; }
+    - echo "$fttc_pds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_pds01_kubeconfig || { echo "Error decoding kubeconfig fttc_pds01"; exit 1; }
 
     # Secure the kubeconfig files
-    - echo "Securing kubeconfig files"
     - chmod 600 /tmp/kubeconfigs/* || { echo "Error securing kubeconfig files"; exit 1; }
 
-    # Verify the contents of kubeconfig files
+    # Verify the contents of kubeconfig files without exposing contents in logs
     - echo "Verifying the contents of kubeconfig files"
     - for file in /tmp/kubeconfigs/*; do
-        echo "Contents of $file:";
-        head -n 5 "$file" || { echo "Error reading file $file"; exit 1; }
+        echo "Verifying file: $file"
+        if [ ! -f "$file" ]; then
+          echo "Error: $file does not exist"
+          exit 1
+        fi
       done
 
     # Verify kubeconfig files exist before merging
@@ -106,7 +95,6 @@ collect_data:
     - kubectl config get-contexts || { echo "Error getting contexts"; exit 1; }
 
     # Ensure scripts are executable
-    - echo "Ensuring scripts are executable"
     - chmod +x scripts/cluster_crawler.sh
     - chmod +x scripts/parser.py
 
@@ -115,6 +103,5 @@ collect_data:
     - ./scripts/cluster_crawler.sh || { echo "Cluster crawler script failed"; exit 1; }
 
     # Clean up temporary files
-    - echo "Cleaning up temporary files"
     - rm -rf /tmp/kubeconfigs || { echo "Error cleaning kubeconfigs"; exit 1; }
     - rm -f /tmp/merged_kubeconfig || { echo "Error cleaning merged kubeconfig"; exit 1; }
