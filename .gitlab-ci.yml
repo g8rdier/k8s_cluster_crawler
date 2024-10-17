@@ -53,18 +53,19 @@ collect_data:
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    - echo "Writing kubeconfig variables to files"
-    - |
-      declare -a KUBECONFIG_NAMES=("fttc_tdf01" "fttc_tds01" "fttc_tf01" "fttc_ts01")
-      for name in "${KUBECONFIG_NAMES[@]}"; do
-        var_name="${name}_kubeconfig"
-        kubeconfig_content="${!var_name}"
-        if [ -z "$kubeconfig_content" ]; then
-          echo "Error: Kubeconfig variable $var_name is empty"
-          exit 1
-        fi
-        echo "$kubeconfig_content" | base64 --decode > "/tmp/kubeconfigs/${name}_kubeconfig" || { echo "Error decoding kubeconfig $name"; exit 1; }
-      done
+   - echo "Writing kubeconfig variables to files"
+- |
+  declare -a KUBECONFIG_NAMES=("fttc_tdf01" "fttc_tds01" "fttc_tf01" "fttc_ts01")
+  for name in "${KUBECONFIG_NAMES[@]}"; do
+    var_name="${name}_kubeconfig"
+    kubeconfig_file="${!var_name}"
+    if [ ! -f "$kubeconfig_file" ]; then
+      echo "Error: Kubeconfig file variable $var_name is not available"
+      exit 1
+    fi
+    base64 --decode "$kubeconfig_file" > "/tmp/kubeconfigs/${name}_kubeconfig" || { echo "Error decoding kubeconfig $name"; exit 1; }
+  done
+
 
     - echo "Securing kubeconfig files"
     - chmod 600 /tmp/kubeconfigs/* || { echo "Error securing kubeconfig files"; exit 1; }
