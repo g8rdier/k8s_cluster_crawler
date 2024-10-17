@@ -17,6 +17,10 @@ collect_data:
           && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
       fi
 
+    # Install Python dependencies
+    - echo "Installing Python dependencies"
+    - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
+
     # Create a temporary directory for kubeconfig files
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
