@@ -1,6 +1,6 @@
 collect_data:
   stage: build
-  image: registry.cloud.fits/fit5/appcore-k8s-builder:2.8.1
+  image: registry.cloud.fits/fit5/appcore-k8s-builder:2.6.0
   timeout: 60m
   variables:
     GIT_SSL_NO_VERIFY: "true"
