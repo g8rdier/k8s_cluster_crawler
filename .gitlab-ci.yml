@@ -26,8 +26,13 @@ collect_data:
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
     # Write kubeconfig variables to files
+    - echo "Writing kubeconfig variables to files"
     - |
-      kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig")
+      kubeconfig_variables=(
+        "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
+        "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig"
+        "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig"
+      )
 
       for var_name in "${kubeconfig_variables[@]}"; do
         cluster_name="${var_name%_kubeconfig}"
