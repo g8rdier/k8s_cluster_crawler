@@ -21,46 +21,15 @@ collect_data:
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Debugging kubeconfig variable
+    # Write kubeconfig variables to files
     - |
-      echo "Debugging kubeconfig variables:"
+      kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig")
 
-      # Check size of each variable
-      if [ -n "$fttc_tdf01_kubeconfig" ]; then
-        echo "fttc_tdf01_kubeconfig size: ${#fttc_tdf01_kubeconfig}"
-      else
-        echo "Error: fttc_tdf01_kubeconfig is empty or not set"
-        exit 1
-      fi
-
-      if [ -n "$fttc_tds01_kubeconfig" ]; then
-        echo "fttc_tds01_kubeconfig size: ${#fttc_tds01_kubeconfig}"
-      else
-        echo "Error: fttc_tds01_kubeconfig is empty or not set"
-        exit 1
-      fi
-
-      if [ -n "$fttc_tf01_kubeconfig" ]; then
-        echo "fttc_tf01_kubeconfig size: ${#fttc_tf01_kubeconfig}"
-      else
-        echo "Error: fttc_tf01_kubeconfig is empty or not set"
-        exit 1
-      fi
-
-      if [ -n "$fttc_ts01_kubeconfig" ]; then
-        echo "fttc_ts01_kubeconfig size: ${#fttc_ts01_kubeconfig}"
-      else
-        echo "Error: fttc_ts01_kubeconfig is empty or not set"
-        exit 1
-      fi
-
-    # Write and decode kubeconfig content
-    - |
-      echo "Decoding and writing kubeconfig variables to files"
-      echo "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig || { echo "Error decoding fttc_tdf01_kubeconfig"; exit 1; }
-      echo "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig || { echo "Error decoding fttc_tds01_kubeconfig"; exit 1; }
-      echo "$fttc_tf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig || { echo "Error decoding fttc_tf01_kubeconfig"; exit 1; }
-      echo "$fttc_ts01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig || { echo "Error decoding fttc_ts01_kubeconfig"; exit 1; }
+      for var_name in "${kubeconfig_variables[@]}"; do
+        cluster_name="${var_name%_kubeconfig}"
+        echo "${!var_name}" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
+        chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
+      done
 
     # Ensure scripts are executable
     - echo "Ensuring scripts are executable"
