@@ -67,49 +67,24 @@ collect_data:
       # List of kubeconfig variable names
       kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig")
 
-      # Print available variables for debugging (safe to display variable names)
-      echo "Available variables:"
-      env | grep -E '^(fttc_.+_kubeconfig)=/'
-
       for var_name in "${kubeconfig_variables[@]}"; do
-        echo "Processing variable: $var_name"
-
-        # Access the file path of the variable (GitLab CI file variables are stored as file paths)
-        kubeconfig_file="${!var_name}"
+        echo "Processing variable: [MASKED]"
+        
+        # Access the base64-encoded variable value
+        kubeconfig_base64="${!var_name}"
 
         # Check if the variable is set
-        if [ -z "$kubeconfig_file" ]; then
-          echo "Error: Kubeconfig file variable $var_name is not available"
+        if [ -z "$kubeconfig_base64" ]; then
+          echo "Error: Kubeconfig variable $var_name is empty or not set"
           exit 1
         fi
 
-        # Check if the file exists
-        if [ ! -f "$kubeconfig_file" ]; then
-          echo "Error: File $kubeconfig_file does not exist"
-          exit 1
-        fi
-
-        # Extract the cluster name by removing '_kubeconfig' from the variable name
+        # Decode the base64 content and write to the kubeconfig file
         cluster_name="${var_name%_kubeconfig}"
+        echo "$kubeconfig_base64" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error decoding kubeconfig for $cluster_name"; exit 1; }
 
-        # Copy the kubeconfig file to the desired location
-        cp "$kubeconfig_file" "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error copying kubeconfig for $cluster_name"; exit 1; }
-      done
-
-    # Secure the kubeconfig files
-    - echo "Securing kubeconfig files"
-    - chmod 600 /tmp/kubeconfigs/* || { echo "Error securing kubeconfig files"; exit 1; }
-
-    # Verify that kubeconfig files exist
-    - echo "Verifying kubeconfig files exist"
-    - |
-      for file in /tmp/kubeconfigs/*; do
-        if [ ! -f "$file" ]; then
-          echo "Error: $file does not exist"
-          exit 1
-        else
-          echo "Verified existence of $file"
-        fi
+        # Secure the kubeconfig file
+        chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
       done
 
     # Ensure scripts are executable
