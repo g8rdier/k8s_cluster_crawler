@@ -4,28 +4,18 @@ collect_data:
   timeout: 60m
   variables:
     GIT_SSL_NO_VERIFY: "true"
+    no_proxy: github.com,objects.githubusercontent.com  # Disable proxy for GitHub-related domains
   script:
-    # Update package lists and install dependencies
-    - echo "Updating package lists and installing dependencies"
-    - apk update && apk add --no-cache curl jq git wget bash ca-certificates openssl
+    # Verify if yq is installed
+    - yq --version || echo "yq is not installed"
 
-    # Install yq (YAML processor)
-    - echo "Installing yq"
-    - wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 \
-      && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
-
-    # Install kubectl
-    - echo "Installing kubectl"
-    - curl -LO "https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl" \
-      && chmod +x kubectl \
-      && mv kubectl /usr/local/bin/ || { echo "Error installing kubectl"; exit 1; }
-
-    # Verify kubectl installation
-    - kubectl version --client || { echo "kubectl installation verification failed"; exit 1; }
-
-    # Install Python dependencies
-    - echo "Installing Python dependencies"
-    - pip install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
+    # Install yq if not present
+    - |
+      if ! command -v yq &> /dev/null; then
+        echo "Installing yq"
+        wget -O /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64" \
+          && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
+      fi
 
     # Create a temporary directory for kubeconfig files
     - echo "Creating directory for kubeconfig files"
@@ -34,26 +24,21 @@ collect_data:
     # Write each kubeconfig variable to a file
     - echo "Writing kubeconfig variables to files"
     - |
-      # List of kubeconfig variable names
       kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig")
 
       for var_name in "${kubeconfig_variables[@]}"; do
         echo "Processing kubeconfig for cluster [REDACTED]"
 
-        # Access the variable content
         kubeconfig_content="${!var_name}"
 
-        # Check if the variable is set
         if [ -z "$kubeconfig_content" ]; then
           echo "Error: Kubeconfig variable is empty or not set"
           exit 1
         fi
 
-        # Write the kubeconfig content to a file
         cluster_name="${var_name%_kubeconfig}"
         echo "$kubeconfig_content" > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
 
-        # Secure the kubeconfig file
         chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
       done
 
@@ -62,7 +47,7 @@ collect_data:
     - chmod +x scripts/cluster_crawler.sh
     - chmod +x scripts/parser.py
 
-    # Run the cluster crawler script
+    # Run your scripts
     - echo "Running cluster crawler script"
     - ./scripts/cluster_crawler.sh -dl || { echo "Cluster crawler script failed"; exit 1; }
 
