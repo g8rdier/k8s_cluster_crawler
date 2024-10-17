@@ -17,33 +17,38 @@ collect_data:
           && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
       fi
 
-    # Install Python dependencies
-    - echo "Installing Python dependencies"
-    - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
+    # Log which clusters are being processed
+    - echo "Logging environment variables for kubeconfigs"
+    - echo "Available Kubeconfig Variables:"
+    - env | grep '_kubeconfig' || { echo "No kubeconfig variables found"; exit 1; }
 
     # Create a temporary directory for kubeconfig files
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Write kubeconfig variables to files
+    # Write each kubeconfig variable to a file
     - echo "Writing kubeconfig variables to files"
     - |
-      kubeconfig_variables=(
-        "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
-        "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig"
-        "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig"
-      )
+      kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig" "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig" "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig")
 
       for var_name in "${kubeconfig_variables[@]}"; do
+        echo "Processing kubeconfig for cluster [REDACTED]: $var_name"
+        kubeconfig_content="${!var_name}"
+
+        if [ -z "$kubeconfig_content" ]; then
+          echo "Error: Kubeconfig variable $var_name is empty or not set"
+          exit 1
+        fi
+
         cluster_name="${var_name%_kubeconfig}"
-        echo "${!var_name}" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
+        echo "$kubeconfig_content" > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
+
         chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
       done
 
-    # Ensure scripts are executable
-    - echo "Ensuring scripts are executable"
+    # Ensure cluster crawler script is executable
+    - echo "Ensuring cluster crawler script is executable"
     - chmod +x scripts/cluster_crawler.sh
-    - chmod +x scripts/parser.py
 
     # Run your scripts
     - echo "Running cluster crawler script"
