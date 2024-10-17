@@ -1,61 +1,31 @@
 collect_data:
   stage: build
-  image: registry.cloud.fits/devops-services/toolchain/docker-go:v0.6.0
+  image: python:3-alpine
   timeout: 60m
   variables:
     GIT_SSL_NO_VERIFY: "true"
   script:
-    # Display OS information
-    - echo "Displaying OS information"
-    - cat /etc/os-release || lsb_release -a || uname -a
-
     # Update package lists and install dependencies
     - echo "Updating package lists and installing dependencies"
-    - apt-get update && apt-get install -y curl jq python3 python3-pip git wget || { echo "Error installing dependencies"; exit 1; }
+    - apk update && apk add --no-cache curl jq git wget bash ca-certificates openssl
 
     # Install yq (YAML processor)
     - echo "Installing yq"
-    - wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
+    - wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 \
+      && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
 
-    # Install kubectl with retry logic
-    - |
-      KUBECTL_RETRIES=5
-      KUBECTL_DOWNLOAD_SUCCESS=false
-      KUBECTL_VERSION="v1.28.0"
-      KUBECTL_EXPECTED_SIZE=49836544  # Adjust if necessary
-
-      for ((i=1; i<=KUBECTL_RETRIES; i++)); do
-        echo "Download attempt $i of $KUBECTL_RETRIES..."
-        if timeout 300 curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"; then
-          if [ $(stat -c%s "kubectl") -ge $KUBECTL_EXPECTED_SIZE ]; then
-            echo "kubectl download succeeded on attempt $i and verified file size."
-            KUBECTL_DOWNLOAD_SUCCESS=true
-            break
-          else
-            echo "kubectl download incomplete (wrong file size), retrying..."
-            rm -f kubectl
-          fi
-        else
-          echo "kubectl download failed on attempt $i. Retrying..."
-          sleep 10
-        fi
-      done
-
-      if [ "$KUBECTL_DOWNLOAD_SUCCESS" = false ]; then
-        echo "kubectl download failed after $KUBECTL_RETRIES attempts."
-        exit 1
-      fi
-
-    # Make kubectl executable and move to bin
-    - chmod +x kubectl
-    - mv kubectl /usr/local/bin/kubectl || { echo "Error moving kubectl to /usr/local/bin"; exit 1; }
+    # Install kubectl
+    - echo "Installing kubectl"
+    - curl -LO "https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl" \
+      && chmod +x kubectl \
+      && mv kubectl /usr/local/bin/ || { echo "Error installing kubectl"; exit 1; }
 
     # Verify kubectl installation
     - kubectl version --client || { echo "kubectl installation verification failed"; exit 1; }
 
     # Install Python dependencies
     - echo "Installing Python dependencies"
-    - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
+    - pip install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
 
     # Create a temporary directory for kubeconfig files
     - echo "Creating directory for kubeconfig files"
@@ -68,20 +38,20 @@ collect_data:
       kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig")
 
       for var_name in "${kubeconfig_variables[@]}"; do
-        echo "Processing variable: [MASKED]"
-        
-        # Access the base64-encoded variable value
-        kubeconfig_base64="${!var_name}"
+        echo "Processing kubeconfig for cluster [REDACTED]"
+
+        # Access the variable content
+        kubeconfig_content="${!var_name}"
 
         # Check if the variable is set
-        if [ -z "$kubeconfig_base64" ]; then
-          echo "Error: Kubeconfig variable $var_name is empty or not set"
+        if [ -z "$kubeconfig_content" ]; then
+          echo "Error: Kubeconfig variable is empty or not set"
           exit 1
         fi
 
-        # Decode the base64 content and write to the kubeconfig file
+        # Write the kubeconfig content to a file
         cluster_name="${var_name%_kubeconfig}"
-        echo "$kubeconfig_base64" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error decoding kubeconfig for $cluster_name"; exit 1; }
+        echo "$kubeconfig_content" > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
 
         # Secure the kubeconfig file
         chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
