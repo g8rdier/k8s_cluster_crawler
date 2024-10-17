@@ -4,6 +4,7 @@ collect_data:
   timeout: 60m
   variables:
     GIT_SSL_NO_VERIFY: "true"
+    no_proxy: github.com,objects.githubusercontent.com  # Disable proxy for GitHub-related domains
   script:
     # Verify if yq is installed
     - yq --version || echo "yq is not installed"
@@ -16,49 +17,45 @@ collect_data:
           && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
       fi
 
-    # Log kubeconfig variables without exposing the contents
-    - echo "Logging kubeconfig variables"
-    - echo "Available Kubeconfig Variables:"
-    - env | grep '_kubeconfig' || { echo "No kubeconfig variables found"; exit 1; }
-
     # Create a temporary directory for kubeconfig files
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Write each kubeconfig variable to a file and log the file contents (without exposing sensitive data)
-    - echo "Writing kubeconfig variables to files"
+    # Write each kubeconfig variable to a file, without logging the contents
+    - echo "Writing kubeconfig variables to files (omitting content for security)"
     - |
-      kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig" "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig" "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig")
+      kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" 
+                            "fttc_ts01_kubeconfig" "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig" 
+                            "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig")
 
       for var_name in "${kubeconfig_variables[@]}"; do
-        echo "Processing kubeconfig for cluster [REDACTED]: $var_name"
+        cluster_name="${var_name%_kubeconfig}"
+        echo "Processing kubeconfig for cluster: $cluster_name"
+        
+        # Access the variable content without logging it
         kubeconfig_content="${!var_name}"
 
+        # Check if the variable is set
         if [ -z "$kubeconfig_content" ]; then
-          echo "Error: Kubeconfig variable $var_name is empty or not set"
+          echo "Error: Kubeconfig variable for $cluster_name is empty or not set"
           exit 1
         fi
 
-        # Decode base64 content and write to the kubeconfig file
-        cluster_name="${var_name%_kubeconfig}"
-        echo "$kubeconfig_content" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error decoding kubeconfig for $cluster_name"; exit 1; }
-
-        # Log the first few lines of the file to ensure it's properly decoded
-        echo "Validating kubeconfig file for $cluster_name:"
-        head -n 10 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error validating kubeconfig for $cluster_name"; exit 1; }
-
+        # Write the kubeconfig content to a file securely
+        echo "$kubeconfig_content" > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
         chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
       done
 
-    # Ensure cluster crawler script is executable
-    - echo "Ensuring cluster crawler script is executable"
+    # Ensure scripts are executable
+    - echo "Ensuring scripts are executable"
     - chmod +x scripts/cluster_crawler.sh
+    - chmod +x scripts/parser.py
 
     # Run your scripts
-    - echo "Running cluster crawler script"
+    - echo "Running cluster crawler script with enhanced logging"
     - ./scripts/cluster_crawler.sh -dl || { echo "Cluster crawler script failed"; exit 1; }
 
-    # Clean up temporary files
+    # Clean up temporary files securely
     - echo "Cleaning up temporary files"
     - rm -rf /tmp/kubeconfigs || { echo "Error cleaning kubeconfigs"; exit 1; }
     - rm -f /tmp/merged_kubeconfig || { echo "Error cleaning merged kubeconfig"; exit 1; }
