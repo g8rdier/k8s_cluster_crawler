@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e  # Exit immediately if a command exits with a non-zero status
 
+# Determine the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Logging function with detailed or regular logging based on a flag
 log() {
     local level="$1"
@@ -24,9 +27,6 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# List of clusters
-UNSERE_CLUSTER="fttc ftctl"
-
 # Marker file to track if the script has already run successfully
 MARKER_FILE="$(dirname "$0")/cluster_crawler_marker"
 
@@ -41,7 +41,7 @@ fi
 create_directory() {
     local locDir="${1}"
     if [ ! -d "${locDir}" ]; then
-        mkdir -p "${locDir}" > /dev/null
+        mkdir -p "${locDir}"
     fi
     if [ ! -d "${locDir}" ]; then
         log "ERROR" "Error creating directory '${locDir}'"
@@ -85,7 +85,7 @@ set_kube_context() {
 DAYSTAMP="$(date +"%Y%m%d")"
 
 # Set up the info cache directory
-INFO_CACHE="info_cache_${DAYSTAMP}"
+INFO_CACHE="${SCRIPT_DIR}/info_cache_${DAYSTAMP}"
 
 if ! create_directory "${INFO_CACHE}"; then
     exit 1
@@ -107,7 +107,7 @@ debug_crawler_error() {
 }
 
 # NAMEID Scraper: Retrieve and save name-ID mapping for all clusters
-NAMEID_MAP="scripts/docs/name_id.map"
+NAMEID_MAP="${SCRIPT_DIR}/docs/name_id.map"
 
 if [ -f "${NAMEID_MAP}" ]; then
     log "INFO" "Static name_id.map file found. Using the file for cluster information."
@@ -117,22 +117,33 @@ else
     exit 1
 fi
 
-# New section: Rename contexts in kubeconfig files to ensure uniqueness
+# New section: Rename contexts, users, and clusters in kubeconfig files to ensure uniqueness
 KUBECONFIGS_DIR="/tmp/kubeconfigs"
 
 if [ -d "$KUBECONFIGS_DIR" ]; then
-    log "INFO" "Renaming contexts in kubeconfig files to ensure uniqueness"
+    log "INFO" "Renaming contexts, users, and clusters in kubeconfig files to ensure uniqueness"
 
     for file in "$KUBECONFIGS_DIR"/*; do
         cluster_name=$(basename "$file" | sed 's/_kubeconfig//' | tr '_' '-')
         echo "Processing file $file with cluster name $cluster_name"
-        export KUBECONFIG="$file"
-        current_context=$(kubectl config current-context)
-        echo "Current context is '$current_context'"
-        if [ "$current_context" != "$cluster_name" ]; then
-            kubectl config rename-context "$current_context" "$cluster_name" || { echo "Error renaming context for $cluster_name"; exit 1; }
-            echo "Renamed context '$current_context' to '$cluster_name'"
-        fi
+
+        # Define new names
+        new_context_name="$cluster_name"
+        new_user_name="${cluster_name}-user"
+        new_cluster_name="${cluster_name}-cluster"
+
+        # Use yq to rename context, user, and cluster
+        yq e "(.contexts[0].name) = \"$new_context_name\"" -i "$file"
+        yq e "(.contexts[0].context.user) = \"$new_user_name\"" -i "$file"
+        yq e "(.contexts[0].context.cluster) = \"$new_cluster_name\"" -i "$file"
+
+        yq e "(.users[0].name) = \"$new_user_name\"" -i "$file"
+        yq e "(.clusters[0].name) = \"$new_cluster_name\"" -i "$file"
+
+        # Update current-context
+        yq e ".\"current-context\" = \"$new_context_name\"" -i "$file"
+
+        echo "Renamed context, user, and cluster in file $file to $new_context_name, $new_user_name, and $new_cluster_name"
     done
 
     # Merge all kubeconfig files into a single file
@@ -142,12 +153,16 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
 
     # Verify contexts after merging
     echo "Available contexts after merging kubeconfig files:"
+    export KUBECONFIG="/tmp/merged_kubeconfig"
     kubectl config get-contexts || { echo "Error retrieving contexts from merged kubeconfig"; exit 1; }
 
 else
     echo "Kubeconfig directory not found!"
     exit 1
 fi
+
+# Use the merged kubeconfig
+export KUBECONFIG="/tmp/merged_kubeconfig"
 
 # Build a mapping from cluster names to context names
 log "INFO" "Building cluster to context mapping"
@@ -157,10 +172,9 @@ declare -A cluster_context_map
 available_contexts=$(kubectl config get-contexts -o name)
 
 for context in $available_contexts; do
-    cluster_info=$(kubectl config view -o jsonpath="{.contexts[?(@.name=='$context')].context.cluster}")
-    cluster_name_from_context="$context"
-    cluster_context_map["$cluster_name_from_context"]="$context"
-    log "DEBUG" "Mapped cluster '$cluster_name_from_context' to context '$context'"
+    # The context name is the cluster name in this setup
+    cluster_context_map["$context"]="$context"
+    log "DEBUG" "Mapped cluster '$context' to context '$context'"
 done
 
 # Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
@@ -176,24 +190,28 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     log "INFO" "Using context: $context for cluster: $CLSTRNM"
     set_kube_context "$context" || { log "ERROR" "Failed to switch to context $context"; continue; }
 
-    # Fetch data for the cluster
-    log "INFO" "Fetching pod and ingress data for $CLSTRNM"
+    # Fetch data for the cluster and directly pass to the parser
+    log "INFO" "Fetching and parsing pod and ingress data for $CLSTRNM"
 
-    PODS_FILE="${INFO_CACHE}/${CLSTRNM}_pods.json"
-    INGRESS_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.json"
+    # Define the output files
+    PODS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_pods.md"
+    INGRESS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.md"
 
-    kubectl get pods -A -o json > "$PODS_FILE" || { log "ERROR" "Failed to get pod data for $CLSTRNM"; continue; }
-    kubectl get ingress -A -o json > "$INGRESS_FILE" || { log "ERROR" "Failed to get ingress data for $CLSTRNM"; continue; }
+    # Fetch pods and parse to Markdown
+    kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl --output_file "$PODS_MD_FILE"
+
+    # Fetch ingress and parse to Markdown
+    kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl --output_file "$INGRESS_MD_FILE"
 
     # Check if the files are correctly written
-    if [ -f "$PODS_FILE" ]; then
-        log "INFO" "Pod data for $CLSTRNM successfully written to $PODS_FILE"
+    if [ -f "$PODS_MD_FILE" ]; then
+        log "INFO" "Pod data for $CLSTRNM successfully written to $PODS_MD_FILE"
     else
         log "ERROR" "Pod data for $CLSTRNM not written to file"
     fi
 
-    if [ -f "$INGRESS_FILE" ]; then
-        log "INFO" "Ingress data for $CLSTRNM successfully written to $INGRESS_FILE"
+    if [ -f "$INGRESS_MD_FILE" ]; then
+        log "INFO" "Ingress data for $CLSTRNM successfully written to $INGRESS_MD_FILE"
     else
         log "ERROR" "Ingress data for $CLSTRNM not written to file"
     fi
@@ -204,17 +222,12 @@ done < "${NAMEID_MAP}"
 log "INFO" "Contents of directory ${INFO_CACHE}:"
 ls -l "${INFO_CACHE}"
 
-# Define the path to the Python script
-PYTHON_PARSER_PATH="scripts/parser.py"
-INPUT_DIR="${INFO_CACHE}"
-OUTPUT_DIR="${INFO_CACHE}"
-
-# Run the Python parser
-python3 "$PYTHON_PARSER_PATH" -dl --input_dir "$INPUT_DIR" --output_dir "$OUTPUT_DIR"
+# --- Begin Git Operations Integration ---
 
 # Git token and repository configuration
 GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
 
+# Mask the Git token in the logs
 echo "oauth: '[MASKED]'"
 
 # Clone the repository into a temporary directory
@@ -248,7 +261,7 @@ if ! cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
     exit 1
 else
     log "INFO" "Pods files copied successfully"
-    fi
+fi
 
 # Configure Git with a generic user
 cd "${REPO_DIR}" || exit
@@ -268,4 +281,6 @@ if ! git diff --cached --quiet; then
 else
     echo "No changes to commit."
 fi
+
 exit 0
+

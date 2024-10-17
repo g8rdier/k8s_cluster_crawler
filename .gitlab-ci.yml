@@ -5,19 +5,20 @@ collect_data:
   variables:
     GIT_SSL_NO_VERIFY: "true"
   script:
-    # Display OS information (non-sensitive)
     - echo "Displaying OS information"
     - cat /etc/os-release || lsb_release -a || uname -a
 
-    # Update package lists and install dependencies (non-sensitive)
-    - apt-get update && apt-get install -y curl jq python3 python3-pip git || { echo "Error installing dependencies"; exit 1; }
+    - echo "Updating package lists and installing dependencies"
+    - apt-get update && apt-get install -y curl jq python3 python3-pip git wget || { echo "Error installing dependencies"; exit 1; }
 
-    # Retry logic for kubectl download with retries, delay, timeout, and file size check
+    - echo "Installing yq"
+    - wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
+
     - |
       KUBECTL_RETRIES=5
       KUBECTL_DOWNLOAD_SUCCESS=false
       KUBECTL_VERSION="v1.28.0"
-      KUBECTL_EXPECTED_SIZE=49836544  # Correct file size in bytes
+      KUBECTL_EXPECTED_SIZE=49836544
 
       for ((i=1; i<=KUBECTL_RETRIES; i++)); do
         echo "Download attempt $i of $KUBECTL_RETRIES..."
@@ -36,40 +37,38 @@ collect_data:
         fi
       done
 
-      # Check if download succeeded
       if [ "$KUBECTL_DOWNLOAD_SUCCESS" = false ]; then
         echo "kubectl download failed after $KUBECTL_RETRIES attempts."
         exit 1
       fi
 
-    # Make kubectl executable and move to bin
     - chmod +x kubectl
     - mv kubectl /usr/local/bin/kubectl || { echo "Error moving kubectl to /usr/local/bin"; exit 1; }
 
-    # Verify kubectl installation
     - kubectl version --client || { echo "kubectl installation verification failed"; exit 1; }
 
-    # Install Python dependencies
     - echo "Installing Python dependencies"
     - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
 
-    # Create a temporary directory for kubeconfig files
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Write each kubeconfig variable to a file without logging sensitive data
     - echo "Writing kubeconfig variables to files"
-    - echo "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig || { echo "Error decoding kubeconfig fttc_tdf01"; exit 1; }
-    - echo "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig || { echo "Error decoding kubeconfig ftctl_tds01"; exit 1; }
-    - echo "$fttc_tf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig || { echo "Error decoding kubeconfig ftctl_tf01"; exit 1; }
-    - echo "$fttc_ts01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig || { echo "Error decoding kubeconfig ftctl_pf01"; exit 1; }
+    - |
+      declare -a KUBECONFIG_NAMES=("fttc_tdf01" "fttc_tds01" "fttc_tf01" "fttc_ts01")
+      for name in "${KUBECONFIG_NAMES[@]}"; do
+        var_name="${name}_kubeconfig"
+        kubeconfig_content="${!var_name}"
+        if [ -z "$kubeconfig_content" ]; then
+          echo "Error: Kubeconfig variable $var_name is empty"
+          exit 1
+        fi
+        echo "$kubeconfig_content" | base64 --decode > "/tmp/kubeconfigs/${name}_kubeconfig" || { echo "Error decoding kubeconfig $name"; exit 1; }
+      done
 
-
-    # Secure the kubeconfig files
     - echo "Securing kubeconfig files"
     - chmod 600 /tmp/kubeconfigs/* || { echo "Error securing kubeconfig files"; exit 1; }
 
-    # Verify that kubeconfig files exist without exposing contents
     - echo "Verifying kubeconfig files exist"
     - |
       for file in /tmp/kubeconfigs/*; do
@@ -81,29 +80,19 @@ collect_data:
         fi
       done
 
-    # Merge the kubeconfig files without exposing the contents
-    - echo "Merging the kubeconfig files"
-    - export KUBECONFIG=$(ls -1 /tmp/kubeconfigs/* | tr '\n' ':') || { echo "Error merging kubeconfigs"; exit 1; }
-    - kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
-
-    # Use the merged kubeconfig
-    - echo "Using the merged kubeconfig"
-    - export KUBECONFIG=/tmp/merged_kubeconfig
-
-    # Verify the contexts in the merged kubeconfig
-    - echo "Verifying the contexts in merged kubeconfig"
-    - kubectl config get-contexts || { echo "Error getting contexts"; exit 1; }
-
-    # Ensure scripts are executable
     - echo "Ensuring scripts are executable"
     - chmod +x scripts/cluster_crawler.sh
     - chmod +x scripts/parser.py
 
-    # Run the cluster crawler script
     - echo "Running cluster crawler script"
-    - ./scripts/cluster_crawler.sh || { echo "Cluster crawler script failed"; exit 1; }
+    - ./scripts/cluster_crawler.sh -dl || { echo "Cluster crawler script failed"; exit 1; }
 
-    # Clean up temporary files
     - echo "Cleaning up temporary files"
     - rm -rf /tmp/kubeconfigs || { echo "Error cleaning kubeconfigs"; exit 1; }
     - rm -f /tmp/merged_kubeconfig || { echo "Error cleaning merged kubeconfig"; exit 1; }
+
+  artifacts:
+    paths:
+      - scripts/info_cache_*
+    expire_in: 1 week
+
