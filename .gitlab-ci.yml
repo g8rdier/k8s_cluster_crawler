@@ -21,48 +21,46 @@ collect_data:
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Reference each kubeconfig variable directly
-    - echo "Processing kubeconfig variables directly for debugging"
-
-    # Processing fttc_tdf01_kubeconfig
+    # Debugging kubeconfig variable
     - |
-      if [ -z "$fttc_tdf01_kubeconfig" ]; then
+      echo "Debugging kubeconfig variables:"
+
+      # Check size of each variable
+      if [ -n "$fttc_tdf01_kubeconfig" ]; then
+        echo "fttc_tdf01_kubeconfig size: ${#fttc_tdf01_kubeconfig}"
+      else
         echo "Error: fttc_tdf01_kubeconfig is empty or not set"
         exit 1
-      else
-        echo "$fttc_tdf01_kubeconfig" > /tmp/kubeconfigs/fttc_tdf01_kubeconfig || { echo "Error writing fttc_tdf01_kubeconfig"; exit 1; }
-        chmod 600 /tmp/kubeconfigs/fttc_tdf01_kubeconfig || { echo "Error setting permissions for fttc_tdf01_kubeconfig"; exit 1; }
       fi
 
-    # Processing fttc_tds01_kubeconfig
-    - |
-      if [ -z "$fttc_tds01_kubeconfig" ]; then
+      if [ -n "$fttc_tds01_kubeconfig" ]; then
+        echo "fttc_tds01_kubeconfig size: ${#fttc_tds01_kubeconfig}"
+      else
         echo "Error: fttc_tds01_kubeconfig is empty or not set"
         exit 1
-      else
-        echo "$fttc_tds01_kubeconfig" > /tmp/kubeconfigs/fttc_tds01_kubeconfig || { echo "Error writing fttc_tds01_kubeconfig"; exit 1; }
-        chmod 600 /tmp/kubeconfigs/fttc_tds01_kubeconfig || { echo "Error setting permissions for fttc_tds01_kubeconfig"; exit 1; }
       fi
 
-    # Processing fttc_tf01_kubeconfig
-    - |
-      if [ -z "$fttc_tf01_kubeconfig" ]; then
+      if [ -n "$fttc_tf01_kubeconfig" ]; then
+        echo "fttc_tf01_kubeconfig size: ${#fttc_tf01_kubeconfig}"
+      else
         echo "Error: fttc_tf01_kubeconfig is empty or not set"
         exit 1
-      else
-        echo "$fttc_tf01_kubeconfig" > /tmp/kubeconfigs/fttc_tf01_kubeconfig || { echo "Error writing fttc_tf01_kubeconfig"; exit 1; }
-        chmod 600 /tmp/kubeconfigs/fttc_tf01_kubeconfig || { echo "Error setting permissions for fttc_tf01_kubeconfig"; exit 1; }
       fi
 
-    # Processing fttc_ts01_kubeconfig
-    - |
-      if [ -z "$fttc_ts01_kubeconfig" ]; then
+      if [ -n "$fttc_ts01_kubeconfig" ]; then
+        echo "fttc_ts01_kubeconfig size: ${#fttc_ts01_kubeconfig}"
+      else
         echo "Error: fttc_ts01_kubeconfig is empty or not set"
         exit 1
-      else
-        echo "$fttc_ts01_kubeconfig" > /tmp/kubeconfigs/fttc_ts01_kubeconfig || { echo "Error writing fttc_ts01_kubeconfig"; exit 1; }
-        chmod 600 /tmp/kubeconfigs/fttc_ts01_kubeconfig || { echo "Error setting permissions for fttc_ts01_kubeconfig"; exit 1; }
       fi
+
+    # Write and decode kubeconfig content
+    - |
+      echo "Decoding and writing kubeconfig variables to files"
+      echo "$fttc_tdf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tdf01_kubeconfig || { echo "Error decoding fttc_tdf01_kubeconfig"; exit 1; }
+      echo "$fttc_tds01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tds01_kubeconfig || { echo "Error decoding fttc_tds01_kubeconfig"; exit 1; }
+      echo "$fttc_tf01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_tf01_kubeconfig || { echo "Error decoding fttc_tf01_kubeconfig"; exit 1; }
+      echo "$fttc_ts01_kubeconfig" | base64 --decode > /tmp/kubeconfigs/fttc_ts01_kubeconfig || { echo "Error decoding fttc_ts01_kubeconfig"; exit 1; }
 
     # Ensure scripts are executable
     - echo "Ensuring scripts are executable"
