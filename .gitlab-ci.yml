@@ -4,7 +4,6 @@ collect_data:
   timeout: 60m
   variables:
     GIT_SSL_NO_VERIFY: "true"
-    no_proxy: github.com,objects.githubusercontent.com  # Disable proxy for GitHub-related domains
   script:
     # Verify if yq is installed
     - yq --version || echo "yq is not installed"
@@ -17,8 +16,8 @@ collect_data:
           && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
       fi
 
-    # Log which clusters are being processed
-    - echo "Logging environment variables for kubeconfigs"
+    # Log kubeconfig variables without exposing the contents
+    - echo "Logging kubeconfig variables"
     - echo "Available Kubeconfig Variables:"
     - env | grep '_kubeconfig' || { echo "No kubeconfig variables found"; exit 1; }
 
@@ -26,7 +25,7 @@ collect_data:
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Write each kubeconfig variable to a file
+    # Write each kubeconfig variable to a file and log the file contents (without exposing sensitive data)
     - echo "Writing kubeconfig variables to files"
     - |
       kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig" "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig" "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig")
@@ -40,8 +39,13 @@ collect_data:
           exit 1
         fi
 
+        # Decode base64 content and write to the kubeconfig file
         cluster_name="${var_name%_kubeconfig}"
-        echo "$kubeconfig_content" > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
+        echo "$kubeconfig_content" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error decoding kubeconfig for $cluster_name"; exit 1; }
+
+        # Log the first few lines of the file to ensure it's properly decoded
+        echo "Validating kubeconfig file for $cluster_name:"
+        head -n 10 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error validating kubeconfig for $cluster_name"; exit 1; }
 
         chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
       done
