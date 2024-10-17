@@ -64,15 +64,36 @@ collect_data:
     # Write each kubeconfig variable to a file
     - echo "Writing kubeconfig variables to files"
     - |
-      declare -a KUBECONFIG_NAMES=("fttc_tdf01" "fttc_tds01" "fttc_tf01" "fttc_ts01")
-      for name in "${KUBECONFIG_NAMES[@]}"; do
-        var_name="${name}_kubeconfig"
+      # List of kubeconfig variable names
+      kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig")
+
+      # Print available variables for debugging (safe to display variable names)
+      echo "Available variables:"
+      env | grep -E '^(fttc_.+_kubeconfig)=/'
+
+      for var_name in "${kubeconfig_variables[@]}"; do
+        echo "Processing variable: $var_name"
+
+        # Access the file path of the variable (GitLab CI file variables are stored as file paths)
         kubeconfig_file="${!var_name}"
-        if [ ! -f "$kubeconfig_file" ]; then
+
+        # Check if the variable is set
+        if [ -z "$kubeconfig_file" ]; then
           echo "Error: Kubeconfig file variable $var_name is not available"
           exit 1
         fi
-        base64 --decode "$kubeconfig_file" > "/tmp/kubeconfigs/${name}_kubeconfig" || { echo "Error decoding kubeconfig $name"; exit 1; }
+
+        # Check if the file exists
+        if [ ! -f "$kubeconfig_file" ]; then
+          echo "Error: File $kubeconfig_file does not exist"
+          exit 1
+        fi
+
+        # Extract the cluster name by removing '_kubeconfig' from the variable name
+        cluster_name="${var_name%_kubeconfig}"
+
+        # Copy the kubeconfig file to the desired location
+        cp "$kubeconfig_file" "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error copying kubeconfig for $cluster_name"; exit 1; }
       done
 
     # Secure the kubeconfig files
