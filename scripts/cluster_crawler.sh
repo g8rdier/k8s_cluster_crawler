@@ -108,20 +108,23 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
         cluster_name=$(basename "$file" | sed 's/_kubeconfig//' | tr '_' '-')
         echo "Processing file $file with cluster name $cluster_name"
 
-        # Define new names based on the cluster name without adding "-user" or "-cluster" suffixes
+        # Define new names
         new_context_name="$cluster_name"
-        new_user_name="$cluster_name"
-        new_cluster_name="$cluster_name"
+        new_user_name="${cluster_name}-user"
+        new_cluster_name="${cluster_name}-cluster"
 
         # Use yq to rename context, user, and cluster
         yq e "(.contexts[0].name) = \"$new_context_name\"" -i "$file"
         yq e "(.contexts[0].context.user) = \"$new_user_name\"" -i "$file"
         yq e "(.contexts[0].context.cluster) = \"$new_cluster_name\"" -i "$file"
 
+        yq e "(.users[0].name) = \"$new_user_name\"" -i "$file"
+        yq e "(.clusters[0].name) = \"$new_cluster_name\"" -i "$file"
+
         # Update current-context
         yq e ".\"current-context\" = \"$new_context_name\"" -i "$file"
 
-        echo "Renamed context, user, and cluster in file $file to $new_context_name"
+        echo "Renamed context, user, and cluster in file $file to $new_context_name, $new_user_name, and $new_cluster_name"
     done
 
     # Merge all kubeconfig files into a single file
@@ -138,7 +141,6 @@ else
     echo "Kubeconfig directory not found!"
     exit 1
 fi
-
 
 # Use the merged kubeconfig
 export KUBECONFIG="/tmp/merged_kubeconfig"
