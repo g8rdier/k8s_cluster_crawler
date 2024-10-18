@@ -29,8 +29,7 @@ collect_data:
     - echo "Writing kubeconfig variables to files"
     - |
       kubeconfig_variables=(
-        "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" 
-        "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
+        "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
         "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig"
         "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig"
       )
@@ -47,7 +46,7 @@ collect_data:
     - chmod +x scripts/parser.py
 
     # Run your scripts
-    - echo "Running cluster crawler script"
+    - echo "Running cluster crawler script with detailed logging"
     - ./scripts/cluster_crawler.sh -dl || { echo "Cluster crawler script failed"; exit 1; }
 
     # Clean up temporary files
