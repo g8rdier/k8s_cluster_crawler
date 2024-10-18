@@ -57,16 +57,17 @@ set_kube_context() {
     log "INFO" "Setting context for cluster $cluster"
 
     # Output available contexts and current context before the switch
-    log "INFO" "Available contexts before switch attempt for $cluster:"
+    log "INFO" "Available contexts before switch:"
     kubectl config get-contexts || { log "ERROR" "Failed to get contexts"; exit 1; }
     current_context=$(kubectl config current-context 2>/dev/null || true)
     log "INFO" "Current context before switch: '${current_context}'"
 
     # Retry logic for switching to the desired context
     for ((i=1; i<=RETRIES; i++)); do
-        log "INFO" "Attempt $i: Trying to use context $cluster"
         if kubectl config use-context "$cluster"; then
             log "INFO" "Successfully switched to context ${cluster}"
+            # Output available contexts and current context after the switch
+            log "INFO" "Available contexts after switch:"
             kubectl config get-contexts || { log "ERROR" "Failed to get contexts"; exit 1; }
             current_context=$(kubectl config current-context)
             log "INFO" "Current context after switch: '${current_context}'"
@@ -275,7 +276,5 @@ git add -A
 
 # Commit and push if there are changes
 git commit -am "Automatisches Update der Cluster-Daten am $(date)" || echo "Nothing to commit, but forcing push."
-
-git push origin main
 
 exit 0
