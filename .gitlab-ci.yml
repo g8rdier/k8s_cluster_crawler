@@ -29,7 +29,8 @@ collect_data:
     - echo "Writing kubeconfig variables to files"
     - |
       kubeconfig_variables=(
-        "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
+        "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" 
+        "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
         "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig"
         "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig"
       )
@@ -48,10 +49,6 @@ collect_data:
     # Run your scripts
     - echo "Running cluster crawler script"
     - ./scripts/cluster_crawler.sh -dl || { echo "Cluster crawler script failed"; exit 1; }
-
-    # Add logging for contexts after kubeconfig merge
-    - echo "Logging available contexts after kubeconfig merge"
-    - kubectl config get-contexts
 
     # Clean up temporary files
     - echo "Cleaning up temporary files"
