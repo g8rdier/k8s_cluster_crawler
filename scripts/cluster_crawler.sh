@@ -57,17 +57,16 @@ set_kube_context() {
     log "INFO" "Setting context for cluster $cluster"
 
     # Output available contexts and current context before the switch
-    log "INFO" "Available contexts before switch:"
+    log "INFO" "Available contexts before switch attempt for $cluster:"
     kubectl config get-contexts || { log "ERROR" "Failed to get contexts"; exit 1; }
     current_context=$(kubectl config current-context 2>/dev/null || true)
     log "INFO" "Current context before switch: '${current_context}'"
 
     # Retry logic for switching to the desired context
     for ((i=1; i<=RETRIES; i++)); do
+        log "INFO" "Attempt $i: Trying to use context $cluster"
         if kubectl config use-context "$cluster"; then
             log "INFO" "Successfully switched to context ${cluster}"
-            # Output available contexts and current context after the switch
-            log "INFO" "Available contexts after switch:"
             kubectl config get-contexts || { log "ERROR" "Failed to get contexts"; exit 1; }
             current_context=$(kubectl config current-context)
             log "INFO" "Current context after switch: '${current_context}'"
@@ -125,7 +124,7 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
 
     for file in "$KUBECONFIGS_DIR"/*; do
         cluster_name=$(basename "$file" | sed 's/_kubeconfig//' | tr '_' '-')
-        echo "Processing file $file with cluster name $cluster_name"
+        log "INFO" "Processing file $file with cluster name $cluster_name"
 
         # Define new names
         new_context_name="$cluster_name"
@@ -143,21 +142,21 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
         # Update current-context
         yq e ".\"current-context\" = \"$new_context_name\"" -i "$file"
 
-        echo "Renamed context, user, and cluster in file $file to $new_context_name, $new_user_name, and $new_cluster_name"
+        log "INFO" "Renamed context, user, and cluster in file $file to $new_context_name, $new_user_name, and $new_cluster_name"
     done
 
     # Merge all kubeconfig files into a single file
-    echo "Merging kubeconfig files:"
+    log "INFO" "Merging kubeconfig files:"
     export KUBECONFIG=$(find "$KUBECONFIGS_DIR" -type f -exec printf '{}:' \;)
-    kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
+    kubectl config view --flatten > /tmp/merged_kubeconfig || { log "ERROR" "Error flattening kubeconfig"; exit 1; }
 
     # Verify contexts after merging
-    echo "Available contexts after merging kubeconfig files:"
+    log "INFO" "Available contexts after merging kubeconfig files:"
     export KUBECONFIG="/tmp/merged_kubeconfig"
-    kubectl config get-contexts || { echo "Error retrieving contexts from merged kubeconfig"; exit 1; }
+    kubectl config get-contexts || { log "ERROR" "Error retrieving contexts from merged kubeconfig"; exit 1; }
 
 else
-    echo "Kubeconfig directory not found!"
+    log "ERROR" "Kubeconfig directory not found!"
     exit 1
 fi
 
@@ -276,5 +275,7 @@ git add -A
 
 # Commit and push if there are changes
 git commit -am "Automatisches Update der Cluster-Daten am $(date)" || echo "Nothing to commit, but forcing push."
+
+git push origin main
 
 exit 0
