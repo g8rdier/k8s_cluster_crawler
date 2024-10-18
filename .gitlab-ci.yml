@@ -14,7 +14,7 @@ collect_data:
       if ! command -v yq &> /dev/null; then
         echo "Installing yq"
         wget -O /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64" \
-          && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
+        && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
       fi
 
     # Install Python dependencies
@@ -25,8 +25,8 @@ collect_data:
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Write kubeconfig variables to files with additional logging
-    - echo "Writing kubeconfig variables to files with additional logging"
+    # Write kubeconfig variables to files
+    - echo "Writing kubeconfig variables to files"
     - |
       kubeconfig_variables=(
         "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
@@ -36,62 +36,27 @@ collect_data:
 
       for var_name in "${kubeconfig_variables[@]}"; do
         cluster_name="${var_name%_kubeconfig}"
-        kubeconfig_content="${!var_name}"
-
-        if [ -z "$kubeconfig_content" ]; then
+        if [ -z "${!var_name}" ]; then
           echo "Error: Kubeconfig variable $var_name is empty or not set"
           exit 1
         fi
 
-        echo "$kubeconfig_content" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || {
-          echo "Error writing kubeconfig for $cluster_name"; exit 1;
-        }
-
-        # Log the length of the kubeconfig to ensure it has content (but not the content itself)
-        config_length=$(wc -c < "/tmp/kubeconfigs/${cluster_name}_kubeconfig")
-        if [ "$config_length" -eq 0 ]; then
-          echo "Error: Kubeconfig file for $cluster_name is empty after decoding"
-          exit 1
-        else
-          echo "Kubeconfig for $cluster_name successfully written with size ${config_length} bytes"
-        fi
-
-        chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || {
-          echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1;
-        }
+        echo "${!var_name}" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
+        chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
       done
+
+    # Verify that kubeconfig files were written
+    - echo "Verifying written kubeconfig files"
+    - ls -l /tmp/kubeconfigs
 
     # Ensure scripts are executable
     - echo "Ensuring scripts are executable"
     - chmod +x scripts/cluster_crawler.sh
+    - chmod +x scripts/parser.py
 
-    # Run the cluster crawler script with additional logging
-    - echo "Running cluster crawler script with additional logging"
-    - ./scripts/cluster_crawler.sh -dl || {
-        echo "Cluster crawler script failed";
-        # Output contents of the kubeconfig directory for debugging
-        echo "Listing kubeconfig files for debugging:";
-        ls -l /tmp/kubeconfigs;
-        exit 1;
-      }
-
-    # Log available contexts after merging kubeconfig files
-    - echo "Logging available contexts after merging kubeconfig files"
-    - export KUBECONFIG=$(find /tmp/kubeconfigs -type f -exec printf '{}:' \;)
-    - kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
-    - export KUBECONFIG=/tmp/merged_kubeconfig
-    - echo "Available contexts after merging:"; kubectl config get-contexts || { echo "Error getting contexts"; exit 1; }
-
-    # Run additional checks on merged kubeconfig to ensure contexts are present
-    - echo "Checking merged kubeconfig for all expected contexts"
-    - |
-      for cluster_name in "${kubeconfig_variables[@]%%_kubeconfig}"; do
-        if ! kubectl config get-contexts | grep -q "$cluster_name"; then
-          echo "Warning: Context for $cluster_name not found in merged kubeconfig"
-        else
-          echo "Context for $cluster_name found"
-        fi
-      done
+    # Run your scripts
+    - echo "Running cluster crawler script"
+    - ./scripts/cluster_crawler.sh -dl || { echo "Cluster crawler script failed"; exit 1; }
 
     # Clean up temporary files
     - echo "Cleaning up temporary files"
