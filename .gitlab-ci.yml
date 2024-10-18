@@ -17,32 +17,26 @@ collect_data:
           && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
       fi
 
+    # Install Python dependencies
+    - echo "Installing Python dependencies"
+    - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
+
     # Create a temporary directory for kubeconfig files
     - echo "Creating directory for kubeconfig files"
     - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
 
-    # Write each kubeconfig variable to a file, without logging the contents
-    - echo "Writing kubeconfig variables to files (omitting content for security)"
+    # Write kubeconfig variables to files
+    - echo "Writing kubeconfig variables to files"
     - |
-      kubeconfig_variables=("fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" 
-                            "fttc_ts01_kubeconfig" "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig" 
-                            "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig")
+      kubeconfig_variables=(
+        "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
+        "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig"
+        "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig"
+      )
 
       for var_name in "${kubeconfig_variables[@]}"; do
         cluster_name="${var_name%_kubeconfig}"
-        echo "Processing kubeconfig for cluster: $cluster_name"
-        
-        # Access the variable content without logging it
-        kubeconfig_content="${!var_name}"
-
-        # Check if the variable is set
-        if [ -z "$kubeconfig_content" ]; then
-          echo "Error: Kubeconfig variable for $cluster_name is empty or not set"
-          exit 1
-        fi
-
-        # Write the kubeconfig content to a file securely
-        echo "$kubeconfig_content" > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
+        echo "${!var_name}" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
         chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
       done
 
@@ -52,10 +46,10 @@ collect_data:
     - chmod +x scripts/parser.py
 
     # Run your scripts
-    - echo "Running cluster crawler script with enhanced logging"
+    - echo "Running cluster crawler script"
     - ./scripts/cluster_crawler.sh -dl || { echo "Cluster crawler script failed"; exit 1; }
 
-    # Clean up temporary files securely
+    # Clean up temporary files
     - echo "Cleaning up temporary files"
     - rm -rf /tmp/kubeconfigs || { echo "Error cleaning kubeconfigs"; exit 1; }
     - rm -f /tmp/merged_kubeconfig || { echo "Error cleaning merged kubeconfig"; exit 1; }
