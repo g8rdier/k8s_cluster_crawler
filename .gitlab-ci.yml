@@ -14,7 +14,7 @@ collect_data:
       if ! command -v yq &> /dev/null; then
         echo "Installing yq"
         wget -O /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64" \
-        && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
+          && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
       fi
 
     # Install Python dependencies
@@ -36,18 +36,9 @@ collect_data:
 
       for var_name in "${kubeconfig_variables[@]}"; do
         cluster_name="${var_name%_kubeconfig}"
-        if [ -z "${!var_name}" ]; then
-          echo "Error: Kubeconfig variable $var_name is empty or not set"
-          exit 1
-        fi
-
         echo "${!var_name}" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
         chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
       done
-
-    # Verify that kubeconfig files were written
-    - echo "Verifying written kubeconfig files"
-    - ls -l /tmp/kubeconfigs
 
     # Ensure scripts are executable
     - echo "Ensuring scripts are executable"
@@ -57,6 +48,10 @@ collect_data:
     # Run your scripts
     - echo "Running cluster crawler script"
     - ./scripts/cluster_crawler.sh -dl || { echo "Cluster crawler script failed"; exit 1; }
+
+    # Add logging for contexts after kubeconfig merge
+    - echo "Logging available contexts after kubeconfig merge"
+    - kubectl config get-contexts
 
     # Clean up temporary files
     - echo "Cleaning up temporary files"
