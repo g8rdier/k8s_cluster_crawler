@@ -27,8 +27,15 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# Set FORCE_REBUILD to 1 to ensure rebuild each time
-FORCE_REBUILD=1
+# Marker file to track if the script has already run successfully
+MARKER_FILE="$(dirname "$0")/cluster_crawler_marker"
+
+# Determine if FORCE_REBUILD should be set
+if [ -f "$MARKER_FILE" ]; then
+    FORCE_REBUILD=0
+else
+    FORCE_REBUILD=1
+fi
 
 # Function to create a directory if it doesn't exist
 create_directory() {
@@ -85,8 +92,19 @@ if ! create_directory "${INFO_CACHE}"; then
 fi
 
 # Rebuild cache if needed
-log "INFO" "FORCE_REBUILD is set to 1, updating all cached cluster information"
-rm -rf "${INFO_CACHE:?}"/* > /dev/null 2>&1 || true
+if [ "${FORCE_REBUILD}" == "1" ]; then
+    log "INFO" "FORCE_REBUILD is set to 1, updating all cached cluster information"
+    rm -rf "${INFO_CACHE:?}"/* > /dev/null 2>&1 || true
+else
+    log "INFO" "FORCE_REBUILD is not set to 1, using cached cluster information"
+fi
+
+# Function for error logging and debugging
+debug_crawler_error() {
+    pwd
+    ls -al
+    ls -al "${INFO_CACHE}"
+}
 
 # NAMEID Scraper: Retrieve and save name-ID mapping for all clusters
 NAMEID_MAP="${SCRIPT_DIR}/docs/name_id.map"
@@ -95,6 +113,7 @@ if [ -f "${NAMEID_MAP}" ]; then
     log "INFO" "Static name_id.map file found. Using the file for cluster information."
 else
     log "ERROR" "Static name_id.map file not found! Please check."
+    debug_crawler_error
     exit 1
 fi
 
@@ -106,7 +125,7 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
 
     for file in "$KUBECONFIGS_DIR"/*; do
         cluster_name=$(basename "$file" | sed 's/_kubeconfig//' | tr '_' '-')
-        echo "Processing file $file with cluster name $cluster_name"
+        log "INFO" "Processing file $file with cluster name $cluster_name"
 
         # Define new names
         new_context_name="$cluster_name"
@@ -124,21 +143,21 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
         # Update current-context
         yq e ".\"current-context\" = \"$new_context_name\"" -i "$file"
 
-        echo "Renamed context, user, and cluster in file $file to $new_context_name, $new_user_name, and $new_cluster_name"
+        log "INFO" "Renamed context, user, and cluster in file $file to $new_context_name, $new_user_name, and $new_cluster_name"
     done
 
     # Merge all kubeconfig files into a single file
-    echo "Merging kubeconfig files:"
+    log "INFO" "Merging kubeconfig files:"
     export KUBECONFIG=$(find "$KUBECONFIGS_DIR" -type f -exec printf '{}:' \;)
-    kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
+    kubectl config view --flatten > /tmp/merged_kubeconfig || { log "ERROR" "Error flattening kubeconfig"; exit 1; }
 
     # Verify contexts after merging
-    echo "Available contexts after merging kubeconfig files:"
+    log "INFO" "Available contexts after merging kubeconfig files:"
     export KUBECONFIG="/tmp/merged_kubeconfig"
-    kubectl config get-contexts || { echo "Error retrieving contexts from merged kubeconfig"; exit 1; }
+    kubectl config get-contexts || { log "ERROR" "Error retrieving contexts from merged kubeconfig"; exit 1; }
 
 else
-    echo "Kubeconfig directory not found!"
+    log "ERROR" "Kubeconfig directory not found!"
     exit 1
 fi
 
@@ -156,6 +175,7 @@ for context in $available_contexts; do
     # The context name is the cluster name in this setup
     cluster_context_map["$context"]="$context"
     log "DEBUG" "Mapped cluster '$context' to context '$context'"
+    log "INFO" "Mapped cluster '$context' to context '$context'"
 done
 
 # Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
@@ -179,10 +199,18 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     INGRESS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.md"
 
     # Fetch pods and parse to Markdown
-    kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl --output_file "$PODS_MD_FILE"
+    if kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl --output_file "$PODS_MD_FILE"; then
+        log "INFO" "Pod data for $CLSTRNM successfully written to $PODS_MD_FILE"
+    else
+        log "ERROR" "Failed to fetch or write pod data for $CLSTRNM"
+    fi
 
     # Fetch ingress and parse to Markdown
-    kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl --output_file "$INGRESS_MD_FILE"
+    if kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl --output_file "$INGRESS_MD_FILE"; then
+        log "INFO" "Ingress data for $CLSTRNM successfully written to $INGRESS_MD_FILE"
+    else
+        log "ERROR" "Failed to fetch or write ingress data for $CLSTRNM"
+    fi
 
     # Check if the files are correctly written
     if [ -f "$PODS_MD_FILE" ]; then
@@ -199,4 +227,43 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 
 done < "${NAMEID_MAP}"
 
-# Ensure all collected data is copied to the output repository and pushed
+# Show contents of the info cache directory
+log "INFO" "Contents of directory ${INFO_CACHE}:"
+ls -l "${INFO_CACHE}"
+
+# --- Begin Git Operations Integration ---
+
+# Git token and repository configuration
+GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
+
+# Mask the Git token in the logs
+log "INFO" "oauth: '[MASKED]'"
+
+# Clone the repository into a temporary directory
+REPO_DIR="/tmp/docs-repo"
+if [ ! -d "${REPO_DIR}" ]; then
+    git clone "${GIT_REPO_URL}" "${REPO_DIR}"
+else
+    cd "${REPO_DIR}" || exit
+    git pull origin main
+    cd - || exit
+fi
+
+# Set paths within the repository
+INGRESS_PATH="${REPO_DIR}/boms/k8s/ingress"
+PODS_PATH="${REPO_DIR}/boms/k8s/pods"
+
+# Create target directories in the repository
+create_directory "${INGRESS_PATH}"
+create_directory "${PODS_PATH}"
+
+# Copy the new data into the repository directory
+if ! cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/"; then
+    log "ERROR" "Error copying ingress files"
+    exit 1
+else
+    log "INFO" "Ingress files copied successfully"
+fi
+
+if ! cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
+    log "ERROR" "Error copying pods files"
