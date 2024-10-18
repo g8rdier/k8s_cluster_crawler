@@ -275,12 +275,7 @@ git pull origin main
 git add -A
 
 # Commit and push if there are changes
-if ! git diff --cached --quiet; then
-    git commit -m "Automatisches Update der Cluster-Daten am $(date)"
-    git push origin main
-else
-    echo "No changes to commit."
-fi
+git commit -am "Automatisches Update der Cluster-Daten am $(date)" || echo "Nothing to commit, but forcing push."
 
 exit 0
 
