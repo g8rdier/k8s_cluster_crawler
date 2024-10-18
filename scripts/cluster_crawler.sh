@@ -277,4 +277,6 @@ git add -A
 # Commit and push if there are changes
 git commit -am "Automatisches Update der Cluster-Daten am $(date)" || echo "Nothing to commit, but forcing push."
 
+git push origin main || log "ERROR" "Failed to push changes"
+
 exit 0
