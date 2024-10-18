@@ -125,13 +125,16 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
 
     for file in "$KUBECONFIGS_DIR"/*; do
         cluster_name=$(basename "$file" | sed 's/_kubeconfig//' | tr '_' '-')
-        echo "Processing file $file with cluster name $cluster_name"
+        log "INFO" "Processing file $file with cluster name $cluster_name"
 
         # Define new names
         new_context_name="$cluster_name"
         new_user_name="${cluster_name}-user"
         new_cluster_name="${cluster_name}-cluster"
 
+        # Log before renaming
+        log "DEBUG" "Renaming context, user, and cluster in file $file"
+        
         # Use yq to rename context, user, and cluster
         yq e "(.contexts[0].name) = \"$new_context_name\"" -i "$file"
         yq e "(.contexts[0].context.user) = \"$new_user_name\"" -i "$file"
@@ -143,21 +146,21 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
         # Update current-context
         yq e ".\"current-context\" = \"$new_context_name\"" -i "$file"
 
-        echo "Renamed context, user, and cluster in file $file to $new_context_name, $new_user_name, and $new_cluster_name"
+        log "INFO" "Renamed context, user, and cluster in file $file to $new_context_name, $new_user_name, and $new_cluster_name"
     done
 
     # Merge all kubeconfig files into a single file
-    echo "Merging kubeconfig files:"
+    log "INFO" "Merging kubeconfig files"
     export KUBECONFIG=$(find "$KUBECONFIGS_DIR" -type f -exec printf '{}:' \;)
-    kubectl config view --flatten > /tmp/merged_kubeconfig || { echo "Error flattening kubeconfig"; exit 1; }
+    kubectl config view --flatten > /tmp/merged_kubeconfig || { log "ERROR" "Error flattening kubeconfig"; exit 1; }
 
     # Verify contexts after merging
-    echo "Available contexts after merging kubeconfig files:"
+    log "INFO" "Available contexts after merging kubeconfig files"
     export KUBECONFIG="/tmp/merged_kubeconfig"
-    kubectl config get-contexts || { echo "Error retrieving contexts from merged kubeconfig"; exit 1; }
+    kubectl config get-contexts || { log "ERROR" "Error retrieving contexts from merged kubeconfig"; exit 1; }
 
 else
-    echo "Kubeconfig directory not found!"
+    log "ERROR" "Kubeconfig directory not found!"
     exit 1
 fi
 
@@ -198,10 +201,10 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     INGRESS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.md"
 
     # Fetch pods and parse to Markdown
-    kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl --output_file "$PODS_MD_FILE"
+    kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl --output_file "$PODS_MD_FILE" || log "ERROR" "Failed to fetch pod data for cluster: $CLSTRNM"
 
     # Fetch ingress and parse to Markdown
-    kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl --output_file "$INGRESS_MD_FILE"
+    kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl --output_file "$INGRESS_MD_FILE" || log "ERROR" "Failed to fetch ingress data for cluster: $CLSTRNM"
 
     # Check if the files are correctly written
     if [ -f "$PODS_MD_FILE" ]; then
@@ -228,7 +231,7 @@ ls -l "${INFO_CACHE}"
 GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
 
 # Mask the Git token in the logs
-echo "oauth: '[MASKED]'"
+log "INFO" "oauth: '[MASKED]'"
 
 # Clone the repository into a temporary directory
 REPO_DIR="/tmp/docs-repo"
@@ -275,7 +278,7 @@ git pull origin main
 git add -A
 
 # Commit and push if there are changes
-git commit -am "Automatisches Update der Cluster-Daten am $(date)" || echo "Nothing to commit, but forcing push."
+git commit -am "Automatisches Update der Cluster-Daten am $(date)" || log "INFO" "No changes to commit, forcing push."
+git push origin main
 
 exit 0
-
