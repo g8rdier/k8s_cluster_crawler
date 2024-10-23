@@ -45,67 +45,23 @@ create_directory() {
     fi
 }
 
-# Function to switch contexts and add context listing for debugging
-set_kube_context() {
-    local cluster="$1"
-    log "INFO" "Switching context for cluster '$cluster'"
-
-    # List available contexts before attempting to switch
-    log "INFO" "Available contexts:"
-    kubectl config get-contexts || { log "ERROR" "Failed to list available contexts"; exit 1; }
-
-    for ((i=1; i<=3; i++)); do  # Retry 3 times if the context switch fails
-        if kubectl config use-context "$cluster"; then
-            log "INFO" "Switched to context '$cluster'"
-            return 0
-        else
-            log "WARNING" "Error switching to context '$cluster', attempt $i/3"
-            sleep 5
-        fi
-    done
-    log "ERROR" "Failed to switch to context '$cluster'"
-    return 1
-}
-
-# Function to verify files
-verify_files() {
-    local name_id_map="$1"
-    local repo_dir="$2"
-    missing_files=0
-    
-    while IFS=";" read -r CLSTRNM _CLSTRID; do
-        [[ -z "$CLSTRNM" || "$CLSTRNM" =~ ^# ]] && continue
-        PODS_MD_FILE="${repo_dir}/boms/k8s/pods/${CLSTRNM}_pods.md"
-        INGRESS_MD_FILE="${repo_dir}/boms/k8s/ingress/${CLSTRNM}_ingress.md"
-        
-        if [ ! -f "$PODS_MD_FILE" ]; then
-            log "ERROR" "Missing pod file for '$CLSTRNM'"
-            missing_files=1
-        fi
-        if [ ! -f "$INGRESS_MD_FILE" ]; then
-            log "ERROR" "Missing ingress file for '$CLSTRNM'"
-            missing_files=1
-        fi
-    done < "$name_id_map"
-    
-    return $missing_files
-}
-
-# Function to collect data from Kubernetes and process it through the Python parser
+# Function to collect data from Kubernetes
 collect_data() {
     local cluster="$1"
-    local context="$2"
-    
-    set_kube_context "$context"
     
     log "INFO" "Collecting raw data for cluster '$cluster'"
-    kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods --output_file "${INFO_CACHE}/${cluster}_pods.md"
-    kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress --output_file "${INFO_CACHE}/${cluster}_ingress.md"
+    kubectl get pods -A -o json > "${INFO_CACHE}/${cluster}_pods.json"
+    kubectl get ingress -A -o json > "${INFO_CACHE}/${cluster}_ingress.json"
 }
 
-# Collect data and overwrite files
+# Remove and overwrite files in the repository
 overwrite_files() {
-    log "INFO" "Copying data files to repo and overwriting"
+    log "INFO" "Removing existing files from repo before overwriting"
+    
+    rm -f "${PODS_PATH}"/*_pods.md
+    rm -f "${INGRESS_PATH}"/*_ingress.md
+
+    log "INFO" "Copying data files to repo (force overwrite)"
     
     cp -rf "${INFO_CACHE}"/*_pods.md "$PODS_PATH"
     cp -rf "${INFO_CACHE}"/*_ingress.md "$INGRESS_PATH"
@@ -122,18 +78,10 @@ log "INFO" "Starting cluster crawler"
 # Loop through the name_id.map
 while IFS=";" read -r CLSTRNM CLSTRID; do
     [[ -z "$CLSTRNM" || "$CLSTRNM" =~ ^# ]] && continue
-    collect_data "$CLSTRNM" "$CLSTRID"
+    collect_data "$CLSTRNM"
 done < "${SCRIPT_DIR}/docs/name_id.map"
 
 overwrite_files
-
-# Verification Step
-if verify_files "${SCRIPT_DIR}/docs/name_id.map" "$REPO_DIR"; then
-    log "INFO" "All expected files are present."
-else
-    log "ERROR" "Some files are missing after copying."
-    exit 1
-fi
 
 # Git Operations
 GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
