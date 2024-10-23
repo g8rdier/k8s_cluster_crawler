@@ -21,17 +21,18 @@ log() {
 # Standard logging level is not detailed unless passed as an argument
 DETAILLIERTES_LOGGING=false
 
+# Initialize NO_COMMIT flag
+NO_COMMIT=false
+
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -dl) DETAILLIERTES_LOGGING=true ;;  # Enable detailed logging
+        --no-commit) NO_COMMIT=true ;;       # Enable no-commit mode
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
 done
-
-# Set FORCE_REBUILD to 1 to ensure rebuild each time
-FORCE_REBUILD=1
 
 # Function to create a directory if it doesn't exist
 create_directory() {
@@ -75,6 +76,41 @@ set_kube_context() {
     done
     log "ERROR" "Failed to switch to context '$cluster' after $RETRIES attempts"
     return 1
+}
+
+# Function to verify that all expected files are present in the repository
+verify_files() {
+    local repo_dir="$1"
+    local name_id_map="$2"
+    local missing_files=0
+
+    while IFS=";" read -r CLSTRNM _CLSTRID; do
+        # Skip empty lines and lines starting with #
+        [[ -z "$CLSTRNM" || "$CLSTRNM" =~ ^# ]] && continue
+
+        # Define expected files
+        PODS_MD_FILE="${repo_dir}/boms/k8s/pods/${CLSTRNM}_pods.md"
+        INGRESS_MD_FILE="${repo_dir}/boms/k8s/ingress/${CLSTRNM}_ingress.md"
+
+        # Check for pod file
+        if [ ! -f "$PODS_MD_FILE" ]; then
+            log "ERROR" "Missing pod file for cluster '$CLSTRNM': '$PODS_MD_FILE'"
+            missing_files=1
+        fi
+
+        # Check for ingress file
+        if [ ! -f "$INGRESS_MD_FILE" ]; then
+            log "ERROR" "Missing ingress file for cluster '$CLSTRNM': '$INGRESS_MD_FILE'"
+            missing_files=1
+        fi
+    done < "$name_id_map"
+
+    if [ "$missing_files" -eq 0 ]; then
+        log "INFO" "All cluster ingress and pod files are present in the repository."
+    else
+        log "ERROR" "Some cluster files are missing in the repository."
+        exit 1
+    fi
 }
 
 # Temporary directory
@@ -215,7 +251,7 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     if kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl --output_file "$INGRESS_MD_FILE"; then
         log "INFO" "Ingress data for '$CLSTRNM' successfully written to '$INGRESS_MD_FILE'"
     else
-        log "ERROR" "Failed to fetch or parse ingress data for '$CLSTRNM'"
+        log "ERROR" "Failed to fetch or parse ingress data for '$CLstrNM'"
     fi
 
 done < "${NAMEID_MAP}"
@@ -269,6 +305,9 @@ else
     exit 1
 fi
 
+# Verification Step
+verify_files "$REPO_DIR" "$NAMEID_MAP" || { log "ERROR" "File verification failed."; exit 1; }
+
 # Configure Git with a generic user
 cd "${REPO_DIR}" || { log "ERROR" "Failed to navigate to '${REPO_DIR}'"; exit 1; }
 git config user.email "ci@f-i-ts.de"
@@ -280,19 +319,24 @@ git pull origin main || { log "ERROR" "Failed to pull latest changes before comm
 # Stage all changes
 git add -A || { log "ERROR" "Failed to stage changes"; exit 1; }
 
-# Commit and push if there are changes
-if git commit -am "Automatisches Update der Cluster-Daten am $(date)"; then
-    log "INFO" "Committed changes successfully"
-else
-    log "WARNING" "Nothing to commit, but proceeding to push"
-fi
+# Conditionally commit and push based on NO_COMMIT flag
+if [ "$NO_COMMIT" = false ]; then
+    # Commit and push if there are changes
+    if git commit -am "Automatisches Update der Cluster-Daten am $(date)"; then
+        log "INFO" "Committed changes successfully"
+    else
+        log "WARNING" "Nothing to commit, but proceeding to push"
+    fi
 
-# Push changes to remote
-if git push origin main; then
-    log "INFO" "Git push completed successfully"
+    # Push changes to remote
+    if git push origin main; then
+        log "INFO" "Git push completed successfully"
+    else
+        log "ERROR" "Failed to push changes to the repository"
+        exit 1
+    fi
 else
-    log "ERROR" "Failed to push changes to the repository"
-    exit 1
+    log "INFO" "No-commit flag is set. Skipping git commit and push."
 fi
 
 exit 0
