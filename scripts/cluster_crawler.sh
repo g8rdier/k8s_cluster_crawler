@@ -188,6 +188,47 @@ for key in "${!cluster_context_map[@]}"; do
     log "INFO" "Cluster: '$key' -> Context: '${cluster_context_map[$key]}'"
 done
 
+# Function to generate a summary of collected data
+generate_summary() {
+    local summary_file="${SCRIPT_DIR}/summary.md"
+    log "INFO" "Generating summary of collected data."
+
+    echo "| Cluster Name | Pods Count | Ingress Count |" > "$summary_file"
+    echo "|--------------|------------|---------------|" >> "$summary_file"
+
+    while IFS=";" read -r CLSTRNM _CLSTRID; do
+        [[ -z "$CLSTRNM" || "$CLSTRNM" =~ ^# ]] && continue
+
+        # Define paths to pod and ingress files for each cluster
+        PODS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_pods.md"
+        INGRESS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.md"
+
+        # Count pods and ingress records for the current cluster
+        pods_count=0
+        ingress_count=0
+
+        if [ -f "$PODS_MD_FILE" ]; then
+            pods_count=$(grep -c "###" "$PODS_MD_FILE")  # Assuming each pod entry starts with '###'
+        fi
+
+        if [ -f "$INGRESS_MD_FILE" ]; then
+            ingress_count=$(grep -c "###" "$INGRESS_MD_FILE")  # Assuming each ingress entry starts with '###'
+        fi
+
+        # Append the cluster information to the summary
+        echo "| ${CLSTRNM} | ${pods_count} | ${ingress_count} |" >> "$summary_file"
+
+    done < "${NAMEID_MAP}"
+
+    log "INFO" "Summary generated. Displaying collected data:"
+    cat "$summary_file"
+
+    # Optionally, copy the summary to the repository to save it
+    cp "$summary_file" "${REPO_DIR}/summary.md" || { log "ERROR" "Failed to copy summary file to repository"; exit 1; }
+
+    log "INFO" "Summary saved to ${REPO_DIR}/summary.md"
+}
+
 # Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
 while IFS=";" read -r CLSTRNM _CLSTRID; do
     [[ -z "$CLSTRNM" || "$CLSTRNM" =~ ^# ]] && continue
@@ -223,7 +264,125 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     fi
 done < "${NAMEID_MAP}"
 
-log "INFO" "Contents of directory '${INFO_CACHE}':"
-ls -l "${INFO_CACHE}" || { log "ERROR" "Failed to list contents of '${INFO_CACHE}'"; exit 1; }
+# Call the generate_summary function after collecting data
+generate_summary
+
+# Before copying the new data into the repository, log the existing files
+log "INFO" "Listing current files in the repository before overwriting"
+
+if [ -d "${INGRESS_PATH}" ]; then
+    log "INFO" "Current files in the ingress directory:"
+    ls -l "${INGRESS_PATH}" || { log "ERROR" "Failed to list ingress directory"; exit 1; }
+else
+    log "WARNING" "Ingress directory does not exist. It will be created."
+fi
+
+if [ -d "${PODS_PATH}" ]; then
+    log "INFO" "Current files in the pods directory:"
+    ls -l "${PODS_PATH}" || { log "ERROR" "Failed to list pods directory"; exit 1; }
+else
+    log "WARNING" "Pods directory does not exist. It will be created."
+fi
+
+# Copy the new data into the repository directory
+log "INFO" "Copying ingress files to '${INGRESS_PATH}/'"
+if cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/"; then
+    log "INFO" "Ingress files copied successfully to '${INGRESS_PATH}/'"
+else
+    log "ERROR" "Error copying ingress files to '${INGRESS_PATH}/'"
+    exit 1
+fi
+
+log "INFO" "Copying pods files to '${PODS_PATH}/'"
+if cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
+    log "INFO" "Pods files copied successfully to '${PODS_PATH}/'"
+else
+    log "ERROR" "Error copying pods files to '${PODS_PATH}/'"
+    exit 1
+fi
+
+# Log the updated contents of the repository
+log "INFO" "Listing updated files in the repository after copying new data"
+log "INFO" "Updated files in the ingress directory:"
+ls -l "${INGRESS_PATH}" || { log "ERROR" "Failed to list ingress directory"; exit 1; }
+
+log "INFO" "Updated files in the pods directory:"
+ls -l "${PODS_PATH}" || { log "ERROR" "Failed to list pods directory"; exit 1; }
+
+# Verification Step: Ensure all files are present in the repository
+verify_files "$REPO_DIR" "$NAMEID_MAP" || { log "ERROR" "File verification failed."; exit 1; }
+
+
+# --- Begin Git Operations Integration ---
+
+# Git token and repository configuration
+GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
+
+# Mask the Git token in the logs
+echo "oauth: '[MASKED]'"
+
+# Clone the repository into a temporary directory
+REPO_DIR="/tmp/docs-repo"
+if [ ! -d "${REPO_DIR}" ]; then
+    log "INFO" "Cloning repository into '${REPO_DIR}'"
+    git clone "${GIT_REPO_URL}" "${REPO_DIR}" || { log "ERROR" "Failed to clone repository"; exit 1; }
+else
+    log "INFO" "Repository already cloned. Pulling latest changes in '${REPO_DIR}'"
+    cd "${REPO_DIR}" || { log "ERROR" "Failed to navigate to '${REPO_DIR}'"; exit 1; }
+    git pull origin main || { log "ERROR" "Failed to pull latest changes"; exit 1; }
+    cd - || exit
+fi
+
+# Set paths within the repository
+INGRESS_PATH="${REPO_DIR}/boms/k8s/ingress"
+PODS_PATH="${REPO_DIR}/boms/k8s/pods"
+
+# Create target directories in the repository
+create_directory "${INGRESS_PATH}" || { log "ERROR" "Failed to create directory '${INGRESS_PATH}'"; exit 1; }
+create_directory "${PODS_PATH}" || { log "ERROR" "Failed to create directory '${PODS_PATH}'"; exit 1; }
+
+# Copy the new data into the repository directory
+log "INFO" "Copying ingress files to '${INGRESS_PATH}/'"
+if cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/"; then
+    log "INFO" "Ingress files copied successfully to '${INGRESS_PATH}/'"
+else
+    log "ERROR" "Error copying ingress files to '${INGRESS_PATH}/'"
+    exit 1
+fi
+
+log "INFO" "Copying pods files to '${PODS_PATH}/'"
+if cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
+    log "INFO" "Pods files copied successfully to '${PODS_PATH}/'"
+else
+    log "ERROR" "Error copying pods files to '${PODS_PATH}/'"
+    exit 1
+fi
+
+# Configure Git with a generic user
+cd "${REPO_DIR}" || { log "ERROR" "Failed to navigate to '${REPO_DIR}'"; exit 1; }
+git config user.email "ci@f-i-ts.de"
+git config user.name "Cluster Crawler"
+
+# Pull the latest changes again to ensure up-to-date before committing
+git pull origin main || { log "ERROR" "Failed to pull latest changes before committing"; exit 1; }
+
+# Stage all changes
+git add -A || { log "ERROR" "Failed to stage changes"; exit 1; }
+
+# Commit and push if there are changes
+if git commit -am "Automatisches Update der Cluster-Daten am $(date)"; then
+    log "INFO" "Committed changes successfully"
+else
+    log "WARNING" "Nothing to commit, but proceeding to push"
+fi
+
+# Push changes to remote
+if git push origin main; then
+    log "INFO" "Git push completed successfully"
+else
+    log "ERROR" "Failed to push changes to the repository"
+    exit 1
+fi
 
 exit 0
+
