@@ -280,8 +280,8 @@ git pull origin main || { log "ERROR" "Failed to pull latest changes before comm
 # Stage all changes
 git add -A || { log "ERROR" "Failed to stage changes"; exit 1; }
 
-# Commit and push if there are changes
-if git commit -am "Automatisches Update der Cluster-Daten am $(date)"; then
+# Commit and push changes, forcing a commit even if there are no changes
+if git commit --allow-empty -am "Automatisches Update der Cluster-Daten am $(date)"; then
     log "INFO" "Committed changes successfully"
 else
     log "WARNING" "Nothing to commit, but proceeding to push"
