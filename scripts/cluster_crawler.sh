@@ -188,6 +188,18 @@ for key in "${!cluster_context_map[@]}"; do
     log "INFO" "Cluster: '$key' -> Context: '${cluster_context_map[$key]}'"
 done
 
+# Git token and repository configuration
+GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
+
+# Mask the Git token in the logs
+echo "oauth: '[MASKED]'"
+
+# Clone the repository into a temporary directory
+REPO_DIR="/tmp/docs-repo"
+# Set paths within the repository
+INGRESS_PATH="${REPO_DIR}/boms/k8s/ingress"
+PODS_PATH="${REPO_DIR}/boms/k8s/pods"
+
 # Copy the new data into the repository directory
 log "INFO" "Copying ingress files to '${INGRESS_PATH}/'"
 if cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/"; then
@@ -328,27 +340,6 @@ ls -l "${PODS_PATH}" || { log "ERROR" "Failed to list pods directory"; exit 1; }
 
 # Verification Step: Ensure all files are present in the repository
 verify_files "$REPO_DIR" "$NAMEID_MAP" || { log "ERROR" "File verification failed."; exit 1; }
-
-
-# --- Begin Git Operations Integration ---
-
-# Git token and repository configuration
-GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
-
-# Mask the Git token in the logs
-echo "oauth: '[MASKED]'"
-
-# Clone the repository into a temporary directory
-REPO_DIR="/tmp/docs-repo"
-if [ ! -d "${REPO_DIR}" ]; then
-    log "INFO" "Cloning repository into '${REPO_DIR}'"
-    git clone "${GIT_REPO_URL}" "${REPO_DIR}" || { log "ERROR" "Failed to clone repository"; exit 1; }
-else
-    log "INFO" "Repository already cloned. Pulling latest changes in '${REPO_DIR}'"
-    cd "${REPO_DIR}" || { log "ERROR" "Failed to navigate to '${REPO_DIR}'"; exit 1; }
-    git pull origin main || { log "ERROR" "Failed to pull latest changes"; exit 1; }
-    cd - || exit
-fi
 
 # Set paths within the repository
 INGRESS_PATH="${REPO_DIR}/boms/k8s/ingress"
