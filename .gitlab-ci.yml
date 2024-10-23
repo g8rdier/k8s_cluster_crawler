@@ -47,7 +47,7 @@ collect_data:
 
     # Run your scripts
     - echo "Running cluster crawler script with detailed logging"
-    - ./scripts/cluster_crawler.sh -dl 2>&1 |  tee cluster_crawler.log || { echo "Cluster crawler script failed"; exit 1; }
+    - ./scripts/cluster_crawler.sh -dl || { echo "Cluster crawler script failed"; exit 1; }
 
     # Clean up temporary files
     - echo "Cleaning up temporary files"
