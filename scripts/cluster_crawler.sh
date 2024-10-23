@@ -165,9 +165,15 @@ for context in $available_contexts; do
     log "DEBUG" "Mapped cluster '$context' to context '$context'"
 done
 
+# Log the cluster to context mappings
+log "INFO" "Cluster to Context Mapping:"
+for key in "${!cluster_context_map[@]}"; do
+    log "INFO" "Cluster: '$key' -> Context: '${cluster_context_map[$key]}'"
+done
+
 # Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
 while IFS=";" read -r CLSTRNM _CLSTRID; do
-    # Skip empty lines and comments
+    # Skip empty lines and lines starting with #
     [[ -z "$CLSTRNM" || "$CLSTRNM" =~ ^# ]] && continue
 
     # Validation: Ensure both CLSTRNM and _CLSTRID are non-empty
@@ -178,7 +184,9 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 
     log "INFO" "Processing cluster: '$CLSTRNM'"
 
-    context="${cluster_context_map[$CLSTRNM]}"
+    # Safely access the associative array with a default value
+    context="${cluster_context_map[$CLSTRNM]:-}"
+
     if [ -z "$context" ]; then
         log "WARNING" "No matching context for cluster '$CLSTRNM', skipping..."
         continue
