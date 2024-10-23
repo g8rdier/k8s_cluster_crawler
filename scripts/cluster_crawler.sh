@@ -188,13 +188,15 @@ for key in "${!cluster_context_map[@]}"; do
     log "INFO" "Cluster: '$key' -> Context: '${cluster_context_map[$key]}'"
 done
 
-# Function to generate a summary of collected data
+
+Copy code
+# Function to generate a summary of collected data and display it in the terminal
 generate_summary() {
-    local summary_file="${SCRIPT_DIR}/summary.md"
     log "INFO" "Generating summary of collected data."
 
-    echo "| Cluster Name | Pods Count | Ingress Count |" > "$summary_file"
-    echo "|--------------|------------|---------------|" >> "$summary_file"
+    # Print header for the summary table
+    echo "| Cluster Name | Pods Count | Ingress Count |"
+    echo "|--------------|------------|---------------|"
 
     while IFS=";" read -r CLSTRNM _CLSTRID; do
         [[ -z "$CLSTRNM" || "$CLSTRNM" =~ ^# ]] && continue
@@ -203,30 +205,30 @@ generate_summary() {
         PODS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_pods.md"
         INGRESS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.md"
 
-        # Count pods and ingress records for the current cluster
+        # Initialize counts for pods and ingress
         pods_count=0
         ingress_count=0
 
+        # Check for pod file and count entries (assuming '###' indicates an entry)
         if [ -f "$PODS_MD_FILE" ]; then
-            pods_count=$(grep -c "###" "$PODS_MD_FILE")  # Assuming each pod entry starts with '###'
+            pods_count=$(grep -c "###" "$PODS_MD_FILE")  # Adjust pattern as necessary
         fi
 
+        # Check for ingress file and count entries
         if [ -f "$INGRESS_MD_FILE" ]; then
-            ingress_count=$(grep -c "###" "$INGRESS_MD_FILE")  # Assuming each ingress entry starts with '###'
+            ingress_count=$(grep -c "###" "$INGRESS_MD_FILE")  # Adjust pattern as necessary
         fi
 
-        # Append the cluster information to the summary
-        echo "| ${CLSTRNM} | ${pods_count} | ${ingress_count} |" >> "$summary_file"
+        # Output the cluster information directly to the terminal
+        echo "| ${CLSTRNM} | ${pods_count} | ${ingress_count} |"
 
     done < "${NAMEID_MAP}"
 
-    log "INFO" "Summary generated. Displaying collected data:"
-    cat "$summary_file"
+    log "INFO" "Summary of collected data displayed in the terminal."
+}
 
-    # Optionally, copy the summary to the repository to save it
-    cp "$summary_file" "${REPO_DIR}/summary.md" || { log "ERROR" "Failed to copy summary file to repository"; exit 1; }
-
-    log "INFO" "Summary saved to ${REPO_DIR}/summary.md"
+# Call the generate_summary function after collecting data
+generate_summary
 }
 
 # Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
