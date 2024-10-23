@@ -1,16 +1,10 @@
-stages:
-  - test
-  - deploy
-
-variables:
-  GIT_SSL_NO_VERIFY: "true"
-  no_proxy: github.com,objects.githubusercontent.com  # Disable proxy for GitHub-related domains
-  PUSH_BOM_PAGES: "${PUSH_BOM_PAGES}"  # Ensure this is set as a protected variable in GitLab CI settings
-
-test_collect_data:
-  stage: test
+collect_data:
+  stage: build
   image: registry.cloud.fits/fits/appcore-k8s-builder:2.8.1
   timeout: 60m
+  variables:
+    GIT_SSL_NO_VERIFY: "true"
+    no_proxy: github.com,objects.githubusercontent.com  # Disable proxy for GitHub-related domains
   script:
     # Verify if yq is installed
     - yq --version || echo "yq is not installed"
@@ -51,9 +45,9 @@ test_collect_data:
     - chmod +x scripts/cluster_crawler.sh
     - chmod +x scripts/parser.py
 
-    # Run your scripts in testing mode
-    - echo "Running cluster crawler script in testing mode (no commit)"
-    - ./scripts/cluster_crawler.sh --no-commit -dl 2>&1 | tee cluster_crawler_test.log || { echo "Cluster crawler script failed in test mode"; exit 1; }
+    # Run your scripts
+    - echo "Running cluster crawler script with detailed logging"
+    - ./scripts/cluster_crawler.sh -dl 2>&1 |  tee cluster_crawler.log || { echo "Cluster crawler script failed"; exit 1; }
 
     # Clean up temporary files
     - echo "Cleaning up temporary files"
@@ -62,69 +56,5 @@ test_collect_data:
 
   artifacts:
     paths:
-      - cluster_crawler_test.log
       - scripts/info_cache_*
     expire_in: 1 week
-
-deploy_collect_data:
-  stage: deploy
-  image: registry.cloud.fits/fits/appcore-k8s-builder:2.8.1
-  timeout: 60m
-  dependencies:
-    - test_collect_data
-  script:
-    # Verify if yq is installed
-    - yq --version || echo "yq is not installed"
-
-    # Install yq if not present
-    - |
-      if ! command -v yq &> /dev/null; then
-        echo "Installing yq"
-        wget -O /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64" \
-          && chmod +x /usr/local/bin/yq || { echo "Error installing yq"; exit 1; }
-      fi
-
-    # Install Python dependencies
-    - echo "Installing Python dependencies"
-    - pip3 install --no-cache-dir tabulate || { echo "Error installing Python dependencies"; exit 1; }
-
-    # Create a temporary directory for kubeconfig files
-    - echo "Creating directory for kubeconfig files"
-    - mkdir -p /tmp/kubeconfigs || { echo "Error creating kubeconfigs directory"; exit 1; }
-
-    # Write kubeconfig variables to files
-    - echo "Writing kubeconfig variables to files"
-    - |
-      kubeconfig_variables=(
-        "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
-        "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig"
-        "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig"
-      )
-
-      for var_name in "${kubeconfig_variables[@]}"; do
-        cluster_name="${var_name%_kubeconfig}"
-        echo "${!var_name}" | base64 --decode > "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error writing kubeconfig for $cluster_name"; exit 1; }
-        chmod 600 "/tmp/kubeconfigs/${cluster_name}_kubeconfig" || { echo "Error setting permissions on kubeconfig for $cluster_name"; exit 1; }
-      done
-
-    # Ensure scripts are executable
-    - echo "Ensuring scripts are executable"
-    - chmod +x scripts/cluster_crawler.sh
-    - chmod +x scripts/parser.py
-
-    # Run your scripts normally (commit and push)
-    - echo "Running cluster crawler script normally (commit and push)"
-    - ./scripts/cluster_crawler.sh -dl 2>&1 | tee cluster_crawler_deploy.log || { echo "Cluster crawler deploy script failed"; exit 1; }
-
-    # Clean up temporary files
-    - echo "Cleaning up temporary files"
-    - rm -rf /tmp/kubeconfigs || { echo "Error cleaning kubeconfigs"; exit 1; }
-    - rm -f /tmp/merged_kubeconfig || { echo "Error cleaning merged kubeconfig"; exit 1; }
-
-  artifacts:
-    paths:
-      - cluster_crawler_deploy.log
-      - scripts/info_cache_*
-    expire_in: 1 week
-  only:
-    - main  # Adjust this to your desired branch
