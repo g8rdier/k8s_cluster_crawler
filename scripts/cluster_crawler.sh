@@ -188,8 +188,23 @@ for key in "${!cluster_context_map[@]}"; do
     log "INFO" "Cluster: '$key' -> Context: '${cluster_context_map[$key]}'"
 done
 
+# Copy the new data into the repository directory
+log "INFO" "Copying ingress files to '${INGRESS_PATH}/'"
+if cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/"; then
+    log "INFO" "Ingress files copied successfully to '${INGRESS_PATH}/'"
+else
+    log "ERROR" "Error copying ingress files to '${INGRESS_PATH}/'"
+    exit 1
+fi
 
-Copy code
+log "INFO" "Copying pods files to '${PODS_PATH}/'"
+if cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
+    log "INFO" "Pods files copied successfully to '${PODS_PATH}/'"
+else
+    log "ERROR" "Error copying pods files to '${PODS_PATH}/'"
+    exit 1
+fi
+
 # Function to generate a summary of collected data and display it in the terminal
 generate_summary() {
     log "INFO" "Generating summary of collected data."
