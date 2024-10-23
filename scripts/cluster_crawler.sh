@@ -45,11 +45,15 @@ create_directory() {
     fi
 }
 
-# Function to switch contexts
+# Function to switch contexts and add context listing for debugging
 set_kube_context() {
     local cluster="$1"
     log "INFO" "Switching context for cluster '$cluster'"
-    
+
+    # List available contexts before attempting to switch
+    log "INFO" "Available contexts:"
+    kubectl config get-contexts || { log "ERROR" "Failed to list available contexts"; exit 1; }
+
     for ((i=1; i<=3; i++)); do  # Retry 3 times if the context switch fails
         if kubectl config use-context "$cluster"; then
             log "INFO" "Switched to context '$cluster'"
