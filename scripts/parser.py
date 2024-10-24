@@ -15,7 +15,7 @@ def configure_logging(detailed):
     else:
         logging.basicConfig(level=logging.WARNING)
 
-def extract_ingress_info(json_data):
+def extract_ingress_info(json_data, timestamp):
     """
     Extracts relevant Ingress information from the given JSON data.
     """
@@ -51,10 +51,10 @@ def extract_ingress_info(json_data):
 
         ports_str = ", ".join(ports) if ports else "80"
 
-        ingress_info.append([namespace, name, hosts, address, ports_str])
+        ingress_info.append([namespace, name, hosts, address, ports_str, timestamp])
     return ingress_info
 
-def extract_pod_info(json_data):
+def extract_pod_info(json_data, timestamp):
     """
     Extracts relevant Pod information from the given JSON data.
     """
@@ -73,7 +73,7 @@ def extract_pod_info(json_data):
 
         logging.info(f"Extracting Pod data for Namespace: {namespace}, Name: {name}, Node: {node_name}, Image(s): {images}")
 
-        pod_info.append([namespace, name, images, node_name, kubernetes_version])
+        pod_info.append([namespace, name, images, node_name, kubernetes_version, timestamp])
     return pod_info
 
 def generate_markdown_table(data, headers, output_file, title):
@@ -104,6 +104,7 @@ def main():
     parser.add_argument('-dl', action='store_true', help="Enable detailed logging.")
     parser.add_argument('--output_file', required=True, help="Path to the output Markdown file.")
     parser.add_argument('--cluster_name', required=False, help="Name of the cluster.")
+    parser.add_argument('--timestamp', required=False, help="Timestamp of data collection.")
     args = parser.parse_args()
 
     configure_logging(args.dl)
@@ -116,20 +117,20 @@ def main():
         sys.exit(1)
 
     if args.pods:
-        pod_info = extract_pod_info(json_data)
+        pod_info = extract_pod_info(json_data, args.timestamp)
         title = args.cluster_name if args.cluster_name else "Cluster Information"
         generate_markdown_table(
             pod_info,
-            ["Namespace", "Pod Name", "Image", "Node Name", "Kubernetes Version"],
+            ["Namespace", "Pod Name", "Image", "Node Name", "Kubernetes Version", "Zeitstempel"],
             output_file=args.output_file,
             title=title
         )
     elif args.ingress:
-        ingress_info = extract_ingress_info(json_data)
+        ingress_info = extract_ingress_info(json_data, args.timestamp)
         title = args.cluster_name if args.cluster_name else "Cluster Information"
         generate_markdown_table(
             ingress_info,
-            ["Namespace", "Name", "Hosts", "Address", "Ports"],
+            ["Namespace", "Name", "Hosts", "Address", "Ports", "Zeitstempel"],
             output_file=args.output_file,
             title=title
         )

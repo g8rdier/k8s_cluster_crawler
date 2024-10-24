@@ -195,6 +195,9 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
     log "INFO" "Using context: '$context' for cluster: '$CLSTRNM'"
     set_kube_context "$context" || { log "ERROR" "Failed to switch to context '$context'"; continue; }
 
+    # Get the current timestamp
+    CURRENT_TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+
     # Fetch data for the cluster and directly pass to the parser
     log "INFO" "Fetching and parsing pod and ingress data for '$CLSTRNM'"
 
@@ -204,7 +207,7 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 
     # Fetch pods and parse to Markdown
     log "INFO" "Fetching pods data for '$CLSTRNM'"
-    if kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl --cluster_name "$CLSTRNM" --output_file "$PODS_MD_FILE"; then
+    if kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl --cluster_name "$CLSTRNM" --timestamp "$CURRENT_TIMESTAMP" --output_file "$PODS_MD_FILE"; then
         log "INFO" "Pod data for '$CLSTRNM' successfully written to '$PODS_MD_FILE'"
     else
         log "ERROR" "Failed to fetch or parse pods data for '$CLSTRNM'"
@@ -212,7 +215,7 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 
     # Fetch ingress and parse to Markdown
     log "INFO" "Fetching ingress data for '$CLSTRNM'"
-    if kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl --cluster_name "$CLSTRNM" --output_file "$INGRESS_MD_FILE"; then
+    if kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl --cluster_name "$CLSTRNM" --timestamp "$CURRENT_TIMESTAMP" --output_file "$INGRESS_MD_FILE"; then
         log "INFO" "Ingress data for '$CLSTRNM' successfully written to '$INGRESS_MD_FILE'"
     else
         log "ERROR" "Failed to fetch or parse ingress data for '$CLSTRNM'"
@@ -280,8 +283,11 @@ git pull origin main || { log "ERROR" "Failed to pull latest changes before comm
 # Stage all changes
 git add -A || { log "ERROR" "Failed to stage changes"; exit 1; }
 
+# Construct the commit message with timestamp
+COMMIT_MESSAGE="Cluster Crawler am $(date +"%Y-%m-%d") um $(date +"%H:%M:%S")"
+
 # Commit and push changes, forcing a commit even if there are no changes
-if git commit --allow-empty -am "Set cluster name as title in generated Markdown files"; then
+if git commit --allow-empty -am "$COMMIT_MESSAGE"; then
     log "INFO" "Committed changes successfully"
 else
     log "WARNING" "Nothing to commit, but proceeding to push"
