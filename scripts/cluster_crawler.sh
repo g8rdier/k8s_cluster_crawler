@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail  # Exit on error, treat unset variables as error, and handle pipeline failures
 
+# Set the timezone to Europe/Berlin
+export TZ="Europe/Berlin"
+
 # Determine the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
