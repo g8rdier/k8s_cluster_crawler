@@ -103,6 +103,7 @@ def main():
     parser.add_argument('--ingress', action='store_true', help="Process ingress data.")
     parser.add_argument('-dl', action='store_true', help="Enable detailed logging.")
     parser.add_argument('--output_file', required=True, help="Path to the output Markdown file.")
+    parser.add_argument('--cluster_name', required=False, help="Name of the cluster.")
     args = parser.parse_args()
 
     configure_logging(args.dl)
@@ -116,19 +117,21 @@ def main():
 
     if args.pods:
         pod_info = extract_pod_info(json_data)
+        title = args.cluster_name if args.cluster_name else "Cluster Information"
         generate_markdown_table(
             pod_info,
             ["Namespace", "Pod Name", "Image", "Node Name", "Kubernetes Version"],
             output_file=args.output_file,
-            title="Pod Information"
+            title=title
         )
     elif args.ingress:
         ingress_info = extract_ingress_info(json_data)
+        title = args.cluster_name if args.cluster_name else "Cluster Information"
         generate_markdown_table(
             ingress_info,
             ["Namespace", "Name", "Hosts", "Address", "Ports"],
             output_file=args.output_file,
-            title="Ingress Information"
+            title=title
         )
     else:
         logging.error("No data type specified. Use --pods or --ingress.")
