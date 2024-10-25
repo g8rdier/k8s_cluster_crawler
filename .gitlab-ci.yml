@@ -58,3 +58,7 @@ collect_data:
     paths:
       - scripts/info_cache_*
     expire_in: 1 week
+
+  only:
+    - main
+    - schedules
