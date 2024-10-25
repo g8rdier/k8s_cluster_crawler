@@ -60,3 +60,4 @@ Installiere die erforderlichen Abhängigkeiten für den Python-Parser:
 ```bash
 pip3 install tabulate
 
+Stelle sicher, dass `yq` verfügbar ist, entweder durch manuelle Installation oder durch automatische Installation über die CI/CD-Pipeline:
