@@ -5,6 +5,7 @@ import argparse
 import logging
 import sys
 from tabulate import tabulate
+from datetime import datetime
 
 def configure_logging(detailed):
     """
@@ -15,7 +16,7 @@ def configure_logging(detailed):
     else:
         logging.basicConfig(level=logging.WARNING)
 
-def extract_ingress_info(json_data, timestamp):
+def extract_ingress_info(json_data):
     """
     Extracts relevant Ingress information from the given JSON data.
     """
@@ -51,10 +52,10 @@ def extract_ingress_info(json_data, timestamp):
 
         ports_str = ", ".join(ports) if ports else "80"
 
-        ingress_info.append([namespace, name, hosts, address, ports_str, timestamp])
+        ingress_info.append([namespace, name, hosts, address, ports_str])
     return ingress_info
 
-def extract_pod_info(json_data, timestamp):
+def extract_pod_info(json_data):
     """
     Extracts relevant Pod information from the given JSON data.
     """
@@ -73,10 +74,10 @@ def extract_pod_info(json_data, timestamp):
 
         logging.info(f"Extracting Pod data for Namespace: {namespace}, Name: {name}, Node: {node_name}, Image(s): {images}")
 
-        pod_info.append([namespace, name, images, node_name, kubernetes_version, timestamp])
+        pod_info.append([namespace, name, images, node_name, kubernetes_version])
     return pod_info
 
-def generate_markdown_table(data, headers, output_file, title):
+def generate_markdown_table(data, headers, output_file, title, timestamp):
     """
     Generates a Markdown file with a table displaying the extracted information.
 
@@ -84,13 +85,16 @@ def generate_markdown_table(data, headers, output_file, title):
     :param headers: Table headers
     :param output_file: Path to the output Markdown file
     :param title: Title for the Markdown content
+    :param timestamp: Timestamp of data collection
     """
     if not data:
         logging.warning(f"No data to generate the Markdown file for {title}.")
         return
 
     table = tabulate(data, headers, tablefmt="pipe")
-    markdown_content = f"# {title}\n\n{table}\n"
+    # Format the timestamp
+    timestamp_formatted = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y, %H:%M")
+    markdown_content = f"# {title}\n\nErstellt am {timestamp_formatted}\n\n{table}\n"
 
     with open(output_file, 'w', encoding='utf-8') as file:
         file.write(markdown_content)
@@ -117,22 +121,24 @@ def main():
         sys.exit(1)
 
     if args.pods:
-        pod_info = extract_pod_info(json_data, args.timestamp)
+        pod_info = extract_pod_info(json_data)
         title = args.cluster_name if args.cluster_name else "Cluster Information"
         generate_markdown_table(
             pod_info,
-            ["Namespace", "Pod Name", "Image", "Node Name", "Kubernetes Version", "Zeitstempel"],
+            ["Namespace", "Pod Name", "Image", "Node Name", "Kubernetes Version"],
             output_file=args.output_file,
-            title=title
+            title=title,
+            timestamp=args.timestamp
         )
     elif args.ingress:
-        ingress_info = extract_ingress_info(json_data, args.timestamp)
+        ingress_info = extract_ingress_info(json_data)
         title = args.cluster_name if args.cluster_name else "Cluster Information"
         generate_markdown_table(
             ingress_info,
-            ["Namespace", "Name", "Hosts", "Address", "Ports", "Zeitstempel"],
+            ["Namespace", "Name", "Hosts", "Address", "Ports"],
             output_file=args.output_file,
-            title=title
+            title=title,
+            timestamp=args.timestamp
         )
     else:
         logging.error("No data type specified. Use --pods or --ingress.")

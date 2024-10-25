@@ -210,7 +210,8 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 
     # Fetch pods and parse to Markdown
     log "INFO" "Fetching pods data for '$CLSTRNM'"
-    if kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl --cluster_name "$CLSTRNM" --timestamp "$CURRENT_TIMESTAMP" --output_file "$PODS_MD_FILE"; then
+    if kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl \
+        --cluster_name "$CLSTRNM" --timestamp "$CURRENT_TIMESTAMP" --output_file "$PODS_MD_FILE"; then
         log "INFO" "Pod data for '$CLSTRNM' successfully written to '$PODS_MD_FILE'"
     else
         log "ERROR" "Failed to fetch or parse pods data for '$CLSTRNM'"
@@ -218,7 +219,8 @@ while IFS=";" read -r CLSTRNM _CLSTRID; do
 
     # Fetch ingress and parse to Markdown
     log "INFO" "Fetching ingress data for '$CLSTRNM'"
-    if kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl --cluster_name "$CLSTRNM" --timestamp "$CURRENT_TIMESTAMP" --output_file "$INGRESS_MD_FILE"; then
+    if kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl \
+        --cluster_name "$CLSTRNM" --timestamp "$CURRENT_TIMESTAMP" --output_file "$INGRESS_MD_FILE"; then
         log "INFO" "Ingress data for '$CLSTRNM' successfully written to '$INGRESS_MD_FILE'"
     else
         log "ERROR" "Failed to fetch or parse ingress data for '$CLSTRNM'"
