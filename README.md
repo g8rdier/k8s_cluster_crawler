@@ -105,7 +105,7 @@ Die Ausgabe des Scrapers besteht aus Markdown-Dateien (`.md`) für jeden Cluster
 Jede Datei enthält einen Zeitstempel, der angibt, wann die Daten gesammelt wurden:
 
 ```
-Erstellt am 28.10.2024, 07:00
+Erstellt am 28.10.2024, 06:00
 ```
 ### Artefakte
 Die generierten Markdown-Dateien werden als Artefakte in der GitLab-Pipeline gespeichert. Sie sind eine Woche lang verfügbar und können heruntergeladen werden.
