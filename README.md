@@ -1,97 +1,62 @@
-# Cluster-Daten-Sammlung und Berichtserstellung
+# Cluster-Scraper und Datenerfassungspipeline
 
-Dieses Repository enthält eine Sammlung von Skripten, die dazu dienen, Daten aus mehreren Kubernetes-Clustern zu sammeln und detaillierte Markdown-Berichte zu generieren. Der Prozess umfasst zwei Hauptskripte:
+Dieses Projekt ist ein Kubernetes-Cluster-Scraper und eine Datenerfassungspipeline, die Informationen über Kubernetes-Pods und Ingresses von mehreren Clustern sammelt. Die Daten werden gesammelt, in Markdown-Format geparst und im Repository zur späteren Analyse gespeichert.
 
-1. **Bash-Skript (`crawl_clusters.sh`)**: Dieses Skript sammelt Daten aus den angegebenen Kubernetes-Clustern.
-2. **Python-Skript (`generate_ingress_reports.py`)**: Dieses Skript verarbeitet die gesammelten Daten und generiert für jeden Cluster ingress-und pod-spezifische Markdownberichte.
+## Funktionen
 
+- **Scraped Kubernetes-Cluster-Daten** (Pods, Ingresses) von mehreren Clustern.
+- **Parsed die gesammelten Daten** in strukturierte Markdown-Dateien (`.md`).
+- **Automatische Ausführung einmal wöchentlich** (Montag um 8 Uhr) über eine CI/CD-Pipeline in GitLab.
+- **Detaillierte Protokollierung** für Transparenz während des Scraping-Prozesses.
+- **Speichert die Daten** für jeden Cluster mit zugehörigen Zeitstempeln.
+- **Unterstützt manuelles und automatisches Auslösen** der CI/CD-Pipeline bei Änderungen im `main`-Branch.
 
-## Voraussetzungen
+## Komponenten
 
-Bevor die Skripte ausgeführt werden, stelle sicher, dass die folgenden Werkzeuge auf deinem System installiert sind:
+### 1. `crawler.sh`
+Das Hauptskript, das für die folgenden Aufgaben verantwortlich ist:
+- Abrufen von Daten von jedem Kubernetes-Cluster (Pods und Ingresses).
+- Aufruf des Python-Parsers zur Umwandlung der Rohdaten in Markdown-Format.
+- Speichern der Ausgaben in den angegebenen Verzeichnissen.
+- Automatisches Pushen der gesammelten Daten in das GitLab-Repository mit einer Commit-Nachricht, die den Zeitstempel enthält.
 
-- **Kubernetes CLI (`kubectl`)**: Wird verwendet, um mit Kubernetes-Clustern zu interagieren.
-- **FI-TS Cloudctl**: Wird verwendet, um mit Kubernetes-Clustern zu interagieren: https://github.com/fi-ts/cloudctl.
-- **Python 3.x**: Das Python-Skript erfordert Python 3.x.
-- Python Abhängigkeiten: Installiere die Python-lib `tabulate`:
-```
-pip install -r requirements.txt
-```
+### 2. `parser.py`
+Ein Python-Skript, das:
+- Die gesammelten JSON-Daten aus den Kubernetes-Clustern verarbeitet.
+- Relevante Informationen über Pods und Ingresses extrahiert.
+- Die Daten in Markdown-Tabellen formatiert.
+- Einen Zeitstempel hinzufügt, der angibt, wann die Daten erfasst wurden.
 
+### 3. `.gitlab-ci.yml`
+Die CI/CD-Pipeline-Konfiguration, die:
+- Automatisch das Skript `crawler.sh` jeden Montag um 8 Uhr ausführt.
+- Manuelles Auslösen unterstützt und auf Änderungen im `main`-Branch reagiert.
+- Artefakte speichert, die die vom Scraper generierten Markdown-Dateien enthalten.
 
-## Nutzungsanleitung
+## Einrichtung
 
-### 1. Repository klonen
+### Voraussetzungen
+- **Zugriff auf mehrere Kubernetes-Cluster.**
+- **Installierte Tools:** `kubectl`, `yq`, `python3`, `pip3`.
+- **GitLab zur Automatisierung mit CI/CD.**
+- **GitLab Personal Access Token** (zum Pushen der Daten zurück ins Repository).
+- **Die `kubeconfig`-Dateien** für jeden Kubernetes-Cluster.
 
-Klone das Repository auf deinen lokalen Rechner:
+### Umgebungsvariablen
+Stelle sicher, dass die folgenden Umgebungsvariablen in deiner CI/CD-Pipeline (GitLab-Projekteinstellungen unter **Settings > CI/CD > Variables**) gesetzt sind:
+- `fttc_tdf01_kubeconfig`, `fttc_tds01_kubeconfig`, `fttc_tf01_kubeconfig` etc., die das Base64-kodierte `kubeconfig` für jeden Cluster enthalten.
+- `PUSH_BOM_PAGES` zur Authentifizierung und zum Pushen der generierten Markdown-Dateien zurück ins Repository.
 
-```
-git clone https://git.f-i-ts.de/devops-services/toolchain/develop/tc-cluster-crawler.git
-cd tc-cluster-crawler
-```
+### Installation
 
-### 2. Bash-Skript ausführen
-Das Skript crawl_clusters.sh sammelt Daten aus den in dem Skript angegebenen Kubernetes-Clustern. Es wechselt die Kontexte zu jedem Cluster, ruft die erforderlichen Informationen ab und speichert sie im Verzeichnis `info_cache_<DATUM>`.
+1. **Repository klonen**:
+   ```bash
+   git clone https://git.f-i-ts.de/devops-services/toolchain/develop/tc-cluster-crawler.git
+   cd tc-cluster-crawler
 
-Erster Lauf des Skripts
-Vor erstem Lauf des Skripts einmal mit `cloudctl login` authentifizieren.
-Anschließend führst du das Skript mit dem `-dl`-Flag für detaillierte Logs aus:
+2. **Abhängigkeiten installieren**:
 
-```
-./crawl_clusters.sh -dl
-```
-
-- `-dl`: Aktiviert detailliertes Logging, das ausführlichere Ausgaben für Debugging- und Überwachungszwecke bereitstellt.
-
-# Nachfolgende Ausführungen
-Bei nachfolgenden Ausführungen verwendet das Skript die zwischengespeicherten Daten, sofern die Umgebungsvariable FORCE_REBUILD nicht auf `1`gesetzt ist. Du kannst das Skript ohne Flags ausführen: 
-```
-./crawl_clusters.sh
-```
-
-Das Skript wechselt automatisch die `FORCE_REBUILD`-Variable, je nachdem, ob es zuvor ausgeführt wurde. Bei erfolgreicher Ausführung wird eine Marker-Datei (`cluster_crawler_marker`) erstellt.
-
-
-### 3. Python-Skript ausführen
-
-
-Sobald die Daten gesammelt wurden, kannst du das Python-Skript ausführen, um Markdown-Berichte zu generieren: 
-```
-python3 generate_ingress_reports.py -dl
-```
-- `-dl`: Aktiviert detailliertes Logging im Python-Skript.
-
-Dieses Skript verarbeitet die gesammelten Daten aus dem Verzeichnis `info_cache_<DATUM>` und speichert die Berichte im Verzeichnis `ergebnisse`.
-
-
-
-
-### Schritt 4: Berichte anzeigen
-Nach der Ausführung des Python-Skripts findest du die generierten Markdown-Dateien im Verzeichnis `ergebnisse`, sortiert nach Cluster-Namen:
-```
-ergebnisse/
-├── fttc-demo1_ingress.md
-├── fttc-pf01_ingress.md
-```
-
-# Fehlersuche
-- **Authentifizierungsprobleme**: Stelle sicher, dass du korrekt mit `cloudctl login`authentifiziert bist.
-- **Force Rebuild**: Setze die Umgebungsvariable `FORCE_REBUILD`auf `1`, wenn das Skript keine neuen Daten sammelt. 
-- Detailliertes Logging: Verwende `dl`für detaillierte Logs bei der Fehlersuche.
-
-
-## Beispielablauf
-
-1. Bash-Skript ausführen, um Cluster-Daten zu sammeln:
-```
-./crawl_clusters.sh -dl
-```
-
-2. Python-Skript ausführen, um Berichte zu generieren:
-```
-python3 generate_ingress_reports.py -dl
-```
-
-3. Die generierten Berichte im Verzeichnis `ergebnisse`anzeigen.
-
+Installiere die erforderlichen Abhängigkeiten für den Python-Parser:
+```bash
+pip3 install tabulate
 
