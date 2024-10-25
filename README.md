@@ -62,3 +62,62 @@ pip3 install tabulate
 ```
 
 Stelle sicher, dass `yq` verfügbar ist, entweder durch manuelle Installation oder durch automatische Installation über die CI/CD-Pipeline:
+```bash
+wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64
+chmod +x /usr/local/bin/yq
+```
+### Verwendung
+
+1. **Manuelle Ausführung lokal**:
+Um den Scraper lokal zu testen, kannst du `crawler.sh` manuell ausführen:
+```bash
+./scripts/cluster_crawler.sh -dl
+```
+Dies wird Daten von den Clustern sammeln, sie mit dem Python-Skript parsen und die resultierenden Markdown-Dateien im Verzeichnis `info_cache` speichern.
+
+2. **Ausführung über Gitlab CI/CD**:
+Der Scraper ist so konfiguriert, dass er automatisch jeden Montag um 8 Uhr über GitLab CI/CD ausgeführt wird. Die `.gitlab-ci.yml`-Datei übernimmt:
+
+- Installation von Abhängigkeiten.
+- Ausführung des Scrapers.
+- Push der Ergebnisse ins Repository.
+
+Die Pipeline kann auch manuell ausgelöst werden, indem Änderungen an den `main`-Branch gepusht werden oder die Pipeline direkt über GitLab ausgeführt wird.
+
+### Ausgaben
+
+Die Ausgabe des Scrapers besteht aus Markdown-Dateien (`.md`) für jeden Cluster. Die Dateien sind wie folgt strukturiert:
+
+- Pod-Informationen:
+   - Namespace
+   - Pod-Name
+   - Image
+   - Node-Name
+   - Kubernetes-Version
+   - Ingress-Informationen:
+
+- Namespace
+   - Name
+   - Hosts
+   - Adresse
+   - Ports
+
+Jede Datei enthält einen Zeitstempel, der angibt, wann die Daten gesammelt wurden:
+
+```
+Erstellt am 28.10.2024, 07:00
+```
+### Artefakte
+Die generierten Markdown-Dateien werden als Artefakte in der GitLab-Pipeline gespeichert. Sie sind eine Woche lang verfügbar und können heruntergeladen werden.
+
+### CI/CD-Konfiguration
+Die `.gitlab-ci.yml`-Datei stellt sicher, dass die Pipeline unter folgenden Bedingungen ausgeführt wird:
+
+Bei Änderungen im `main`-Branch und bei geplanten Ausführungen.
+Ein wöchentlicher Lauf erfolgt jeden Montag um 7 Uhr.
+Die Pipeline kann manuell oder bei Änderungen im `main`-Branch ausgelöst werden.
+Die Job-Ergebnisse werden als Commit mit Zeitstempel in das Repository gepusht.
+
+
+
+
