@@ -289,7 +289,7 @@ git pull origin main || { log "ERROR" "Failed to pull latest changes before comm
 git add -A || { log "ERROR" "Failed to stage changes"; exit 1; }
 
 # Construct the commit message with timestamp
-COMMIT_MESSAGE="Cluster Crawler am $(date +"%Y-%m-%d") um $(date +"%H:%M:%S")"
+COMMIT_MESSAGE="Clustercrawling am $(date +"%d.%m.%Y") um $(date +"%H:%M") Uhr"
 
 # Commit and push changes, forcing a commit even if there are no changes
 if git commit --allow-empty -am "$COMMIT_MESSAGE"; then
