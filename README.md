@@ -6,7 +6,7 @@ Dieses Projekt ist ein Kubernetes-Cluster-Scraper und eine Datenerfassungspipeli
 
 - **Scraped Kubernetes-Cluster-Daten** (Pods, Ingresses) von mehreren Clustern.
 - **Parsed die gesammelten Daten** in strukturierte Markdown-Dateien (`.md`).
-- **Automatische Ausführung einmal wöchentlich** (Montag um 6 Uhr) über eine CI/CD-Pipeline in GitLab.
+- **Automatische Ausführung einmal täglich** (um 3 Uhr) über eine CI/CD-Pipeline in GitLab.
 - **Detaillierte Protokollierung** für Transparenz während des Scraping-Prozesses.
 - **Speichert die Daten** für jeden Cluster mit zugehörigen Zeitstempeln.
 - **Unterstützt manuelles und automatisches Auslösen** der CI/CD-Pipeline bei Änderungen im `main`-Branch.
@@ -29,7 +29,7 @@ Ein Python-Skript, das:
 
 ### 3. `.gitlab-ci.yml`
 Die CI/CD-Pipeline-Konfiguration, die:
-- Automatisch das Skript `crawler.sh` jeden Montag um 6 Uhr ausführt.
+- Automatisch das Skript `crawler.sh` jeden Tag um 3 Uhr ausführt.
 - Manuelles Auslösen unterstützt und auf Änderungen im `main`-Branch reagiert.
 - Artefakte speichert, die die vom Scraper generierten Markdown-Dateien enthalten.
 
@@ -76,7 +76,7 @@ Um den Scraper lokal zu testen, kannst du `crawler.sh` manuell ausführen:
 Dies wird Daten von den Clustern sammeln, sie mit dem Python-Skript parsen und die resultierenden Markdown-Dateien im Verzeichnis `info_cache` speichern.
 
 2. **Ausführung über Gitlab CI/CD**:
-Der Scraper ist so konfiguriert, dass er automatisch jeden Montag um 6 Uhr über GitLab CI/CD ausgeführt wird. Die `.gitlab-ci.yml`-Datei übernimmt:
+Der Scraper ist so konfiguriert, dass er automatisch jeden Tag um 3 Uhr über GitLab CI/CD ausgeführt wird. Die `.gitlab-ci.yml`-Datei übernimmt:
 
 - Installation von Abhängigkeiten.
 - Ausführung des Scrapers.
@@ -105,7 +105,7 @@ Die Ausgabe des Scrapers besteht aus Markdown-Dateien (`.md`) für jeden Cluster
 Jede Datei enthält einen Zeitstempel, der angibt, wann die Daten gesammelt wurden:
 
 ```
-Erstellt am 28.10.2024, 06:00
+Erstellt am 28.10.2024, 03:00
 ```
 ### Artefakte
 Die generierten Markdown-Dateien werden als Artefakte in der GitLab-Pipeline gespeichert. Sie sind eine Woche lang verfügbar und können heruntergeladen werden.
