@@ -32,6 +32,8 @@ collect_data:
         "fttc_tdf01_kubeconfig" "fttc_tds01_kubeconfig" "fttc_tf01_kubeconfig" "fttc_ts01_kubeconfig"
         "fttc_pdf01_kubeconfig" "fttc_pds01_kubeconfig"
         "ftctl_pf01_kubeconfig" "ftctl_ps01_kubeconfig"
+        "fttc_tn01_kubeconfig" "fttc_pf01_kubeconfig" "fttc_ps01_kubeconfig" 
+        "fttc_tf02_kubeconfig" "yt24_edu_kubeconfig"
       )
 
       for var_name in "${kubeconfig_variables[@]}"; do
