@@ -235,7 +235,7 @@ ls -l "${INFO_CACHE}" || { log "ERROR" "Failed to list contents of '${INFO_CACHE
 # --- Begin Git Operations Integration ---
 
 # Git token and repository configuration
-GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/toolchain/docs.git"
+GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/alle/docs/intern.git"
 
 # Mask the Git token in the logs
 echo "oauth: '[MASKED]'"
@@ -253,8 +253,8 @@ else
 fi
 
 # Set paths within the repository
-INGRESS_PATH="${REPO_DIR}/boms/k8s/ingress"
-PODS_PATH="${REPO_DIR}/boms/k8s/pods"
+INGRESS_PATH="${REPO_DIR}/betrieb/boms/k8s/ingress"
+PODS_PATH="${REPO_DIR}/betrieb/boms/k8s/pods"
 
 # Create target directories in the repository
 create_directory "${INGRESS_PATH}" || { log "ERROR" "Failed to create directory '${INGRESS_PATH}'"; exit 1; }
