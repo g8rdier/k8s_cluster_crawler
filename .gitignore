@@ -13,3 +13,6 @@ scripts/tmps
 # Generated directories
 scripts/info_cache_*/
 scripts/results/
+# Generated directories
+scripts/info_cache_*/
+scripts/results/
