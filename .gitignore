@@ -10,3 +10,6 @@ scripts/results/**/*.json
 
 # Ignore tmps directory entirely
 scripts/tmps
+# Generated directories
+scripts/info_cache_*/
+scripts/results/
