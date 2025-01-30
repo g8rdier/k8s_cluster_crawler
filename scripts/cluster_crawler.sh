@@ -4,8 +4,9 @@ set -euo pipefail  # Exit on error, treat unset variables as error, and handle p
 # Set the timezone to Europe/Berlin
 export TZ="Europe/Berlin"
 
-# Determine the directory where the script is located
+# Set script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLUSTER_MAP="$SCRIPT_DIR/docs/cluster_map.yaml"  # This was pointing to the old file
 
 # Logging function with timestamps
 log() {
