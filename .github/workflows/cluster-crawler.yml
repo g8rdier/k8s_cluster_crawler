@@ -41,4 +41,4 @@ jobs:
 
     - name: Run cluster crawler
       run: |
-        ./scripts/docs/cluster_crawler.sh -dl
+        ./scripts/cluster_crawler.sh -dl
