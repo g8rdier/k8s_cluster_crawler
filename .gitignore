@@ -1,0 +1,12 @@
+# Ignore only the JSON files and temporary files inside scripts/info_cache_*
+scripts/info_cache_*/**/*.json
+
+# Do not ignore Markdown files
+!scripts/info_cache_*/**/*.md
+
+# Ignore results directory, but not the Markdown files
+scripts/results/**/*.json
+!scripts/results/**/*.md
+
+# Ignore tmps directory entirely
+scripts/tmps
