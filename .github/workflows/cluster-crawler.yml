@@ -1,0 +1,71 @@
+name: Cluster Crawler
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 3 * * *'  # Run at 3 AM UTC daily
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  collect_data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'poetry'
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+
+    - name: Install dependencies
+      run: poetry install --no-interaction --no-root
+
+    - name: Install yq
+      run: |
+        wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64
+        chmod +x /usr/local/bin/yq
+
+    - name: Create kubeconfig directory
+      run: mkdir -p /tmp/kubeconfigs
+
+    - name: Setup kubeconfig files
+      env:
+        PROD_CLUSTER_1_KUBECONFIG: ${{ secrets.PROD_CLUSTER_1_KUBECONFIG }}
+        PROD_CLUSTER_2_KUBECONFIG: ${{ secrets.PROD_CLUSTER_2_KUBECONFIG }}
+        STAGE_CLUSTER_1_KUBECONFIG: ${{ secrets.STAGE_CLUSTER_1_KUBECONFIG }}
+        STAGE_CLUSTER_2_KUBECONFIG: ${{ secrets.STAGE_CLUSTER_2_KUBECONFIG }}
+        DEV_CLUSTER_1_KUBECONFIG: ${{ secrets.DEV_CLUSTER_1_KUBECONFIG }}
+        DEV_CLUSTER_2_KUBECONFIG: ${{ secrets.DEV_CLUSTER_2_KUBECONFIG }}
+      run: |
+        for config in PROD_CLUSTER_{1,2}_KUBECONFIG STAGE_CLUSTER_{1,2}_KUBECONFIG DEV_CLUSTER_{1,2}_KUBECONFIG; do
+          if [ ! -z "${!config}" ]; then
+            echo "${!config}" | base64 -d > "/tmp/kubeconfigs/${config,,}_kubeconfig"
+            chmod 600 "/tmp/kubeconfigs/${config,,}_kubeconfig"
+          fi
+        done
+
+    - name: Run cluster crawler
+      run: |
+        chmod +x scripts/cluster_crawler.sh scripts/parser.py
+        ./scripts/cluster_crawler.sh -dl 2>&1 | tee cluster_crawler.log
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: cluster-data
+        path: scripts/info_cache_*
+        retention-days: 7
+
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -rf /tmp/kubeconfigs
+        rm -f /tmp/merged_kubeconfig 

@@ -1,12 +1,30 @@
-# Ignore only the JSON files and temporary files inside scripts/info_cache_*
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Cache directories
 scripts/info_cache_*/**/*.json
-
-# Do not ignore Markdown files
-!scripts/info_cache_*/**/*.md
-
-# Ignore results directory, but not the Markdown files
 scripts/results/**/*.json
+scripts/tmps/
+
+# Keep Markdown files
+!scripts/info_cache_*/**/*.md
 !scripts/results/**/*.md
 
-# Ignore tmps directory entirely
-scripts/tmps
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

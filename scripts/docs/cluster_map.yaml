@@ -1,0 +1,26 @@
+# Production clusters
+clusters:
+  prod-cluster-1:
+    uuid: cluster-prod-1-uuid
+  prod-cluster-2:
+    uuid: cluster-prod-2-uuid
+  prod-cluster-3:
+    uuid: cluster-prod-3-uuid
+
+# Staging clusters
+stage-cluster-1:
+  uuid: cluster-stage-1-uuid
+stage-cluster-2:
+  uuid: cluster-stage-2-uuid
+
+# Development clusters
+dev-cluster-1:
+  uuid: cluster-dev-1-uuid
+dev-cluster-2:
+  uuid: cluster-dev-2-uuid
+
+# Test clusters
+test-cluster-1:
+  uuid: cluster-test-1-uuid
+test-cluster-2:
+  uuid: cluster-test-2-uuid

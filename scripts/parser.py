@@ -5,7 +5,7 @@ import argparse
 import logging
 import sys
 from tabulate import tabulate
-from datetime import datetime
+from datetime import datetime, timezone
 
 def configure_logging(detailed):
     """
@@ -93,8 +93,8 @@ def generate_markdown_table(data, headers, output_file, title, timestamp):
 
     table = tabulate(data, headers, tablefmt="pipe")
     # Format the timestamp
-    timestamp_formatted = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y, %H:%M")
-    markdown_content = f"# {title}\n\nErstellt am {timestamp_formatted}\n\n{table}\n"
+    timestamp_formatted = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).strftime("%d.%m.%Y, %H:%M UTC")
+    markdown_content = f"# {title}\n\nCreated on {timestamp_formatted}\n\n{table}\n"
 
     with open(output_file, 'w', encoding='utf-8') as file:
         file.write(markdown_content)

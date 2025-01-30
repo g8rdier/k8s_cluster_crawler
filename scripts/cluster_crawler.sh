@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail  # Exit on error, treat unset variables as error, and handle pipeline failures
 
-# Set the timezone to Europe/Berlin
-export TZ="Europe/Berlin"
+# Set the timezone
+export TZ="UTC"
 
 # Determine the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,7 +14,7 @@ log() {
     local timestamp
     timestamp=$(date +"%Y-%m-%d %H:%M:%S")
 
-    if [ "${DETAILLIERTES_LOGGING:-false}" = true ]; then
+    if [ "${DETAILED_LOGGING:-false}" = true ]; then
         echo "$timestamp [$level]: $message"
     elif [ "$level" != "DEBUG" ]; then
         echo "$timestamp [$level]: $message"
@@ -22,12 +22,12 @@ log() {
 }
 
 # Standard logging level is not detailed unless passed as an argument
-DETAILLIERTES_LOGGING=false
+DETAILED_LOGGING=false
 
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -dl) DETAILLIERTES_LOGGING=true ;;  # Enable detailed logging
+        -dl) DETAILED_LOGGING=true ;;  # Enable detailed logging
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -38,12 +38,12 @@ FORCE_REBUILD=1
 
 # Function to create a directory if it doesn't exist
 create_directory() {
-    local locDir="${1}"
-    if [ ! -d "${locDir}" ]; then
-        mkdir -p "${locDir}"
+    local dir="${1}"
+    if [ ! -d "${dir}" ]; then
+        mkdir -p "${dir}"
     fi
-    if [ ! -d "${locDir}" ]; then
-        log "ERROR" "Error creating directory '${locDir}'"
+    if [ ! -d "${dir}" ]; then
+        log "ERROR" "Error creating directory '${dir}'"
         return 1
     fi
     return 0
@@ -65,7 +65,6 @@ set_kube_context() {
     for ((i=1; i<=RETRIES; i++)); do
         if kubectl config use-context "$cluster"; then
             log "INFO" "Successfully switched to context '$cluster'"
-            # Output available contexts and current context after the switch
             log "INFO" "Available contexts after switch:"
             kubectl config get-contexts || { log "ERROR" "Failed to get contexts"; exit 1; }
             current_context=$(kubectl config current-context)
@@ -80,10 +79,8 @@ set_kube_context() {
     return 1
 }
 
-# Temporary directory
+# Set up directories
 DAYSTAMP="$(date +"%Y%m%d")"
-
-# Set up the info cache directory
 INFO_CACHE="${SCRIPT_DIR}/info_cache_${DAYSTAMP}"
 
 if ! create_directory "${INFO_CACHE}"; then
@@ -94,21 +91,21 @@ fi
 log "INFO" "FORCE_REBUILD is set to 1, updating all cached cluster information"
 rm -rf "${INFO_CACHE:?}"/* > /dev/null 2>&1 || true
 
-# NAMEID Scraper: Retrieve and save name-ID mapping for all clusters
-NAMEID_MAP="${SCRIPT_DIR}/docs/name_id.map"
+# Cluster mapping file
+CLUSTER_MAP="${SCRIPT_DIR}/docs/cluster_map.yaml"
 
-if [ -f "${NAMEID_MAP}" ]; then
-    log "INFO" "Static name_id.map file found. Using the file for cluster information."
+if [ -f "${CLUSTER_MAP}" ]; then
+    log "INFO" "Static cluster_map.yaml file found. Using the file for cluster information."
 else
-    log "ERROR" "Static name_id.map file not found! Please check."
+    log "ERROR" "Static cluster_map.yaml file not found! Please check."
     exit 1
 fi
 
-# Log the contents of name_id.map for verification
-log "INFO" "Contents of ${NAMEID_MAP}:"
-cat "${NAMEID_MAP}" || { log "ERROR" "Failed to read ${NAMEID_MAP}"; exit 1; }
+# Log the contents of cluster_map.yaml for verification
+log "INFO" "Contents of ${CLUSTER_MAP}:"
+cat "${CLUSTER_MAP}" || { log "ERROR" "Failed to read ${CLUSTER_MAP}"; exit 1; }
 
-# New section: Rename contexts, users, and clusters in kubeconfig files to ensure uniqueness
+# Set up kubeconfig
 KUBECONFIGS_DIR="/tmp/kubeconfigs"
 
 if [ -d "$KUBECONFIGS_DIR" ]; then
@@ -134,10 +131,10 @@ if [ -d "$KUBECONFIGS_DIR" ]; then
         # Update current-context
         yq e ".\"current-context\" = \"$new_context_name\"" -i "$file" || { log "ERROR" "Failed to update current-context in '$file'"; exit 1; }
 
-        log "INFO" "Renamed context, user, and cluster in file '$file' to '$new_context_name', '$new_user_name', and '$new_cluster_name'"
+        log "INFO" "Renamed context, user, and cluster in file '$file'"
     done
 
-    # Merge all kubeconfig files into a single file
+    # Merge all kubeconfig files
     log "INFO" "Merging kubeconfig files"
     export KUBECONFIG=$(find "$KUBECONFIGS_DIR" -type f -exec printf '{}:' \;)
     kubectl config view --flatten > /tmp/merged_kubeconfig || { log "ERROR" "Error flattening kubeconfig"; exit 1; }
@@ -155,154 +152,105 @@ fi
 # Use the merged kubeconfig
 export KUBECONFIG="/tmp/merged_kubeconfig"
 
-# Build a mapping from cluster names to context names
+# Build cluster to context mapping
 log "INFO" "Building cluster to context mapping"
-
 declare -A cluster_context_map
-
 available_contexts=$(kubectl config get-contexts -o name)
 
 for context in $available_contexts; do
-    # The context name is the cluster name in this setup
     cluster_context_map["$context"]="$context"
     log "DEBUG" "Mapped cluster '$context' to context '$context'"
 done
 
-# Log the cluster to context mappings
-log "INFO" "Cluster to Context Mapping:"
-for key in "${!cluster_context_map[@]}"; do
-    log "INFO" "Cluster: '$key' -> Context: '${cluster_context_map[$key]}'"
-done
+# Process each cluster
+while IFS=";" read -r CLUSTER_NAME _CLUSTER_ID; do
+    [[ -z "$CLUSTER_NAME" || "$CLUSTER_NAME" =~ ^# ]] && continue
 
-# Kubernetes Data Collector: Retrieve and save Kubernetes information (pods and ingress) for each cluster
-while IFS=";" read -r CLSTRNM _CLSTRID; do
-    # Skip empty lines and lines starting with #
-    [[ -z "$CLSTRNM" || "$CLSTRNM" =~ ^# ]] && continue
-
-    # Validation: Ensure both CLSTRNM and _CLSTRID are non-empty
-    if [[ -z "$CLSTRNM" || -z "$_CLSTRID" ]]; then
-        log "ERROR" "Invalid entry in name_id.map: '$CLSTRNM;$_CLSTRID'"
+    if [[ -z "$CLUSTER_NAME" || -z "$_CLUSTER_ID" ]]; then
+        log "ERROR" "Invalid entry in cluster_map.yaml: '$CLUSTER_NAME;$_CLUSTER_ID'"
         exit 1
     fi
 
-    log "INFO" "Processing cluster: '$CLSTRNM'"
-
-    # Safely access the associative array with a default value
-    context="${cluster_context_map[$CLSTRNM]:-}"
+    log "INFO" "Processing cluster: '$CLUSTER_NAME'"
+    context="${cluster_context_map[$CLUSTER_NAME]:-}"
 
     if [ -z "$context" ]; then
-        log "WARNING" "No matching context for cluster '$CLSTRNM', skipping..."
+        log "WARNING" "No matching context for cluster '$CLUSTER_NAME', skipping..."
         continue
     fi
 
-    log "INFO" "Using context: '$context' for cluster: '$CLSTRNM'"
-    set_kube_context "$context" || { log "ERROR" "Failed to switch to context '$context'"; continue; }
-
-    # Get the current timestamp
+    # Get current timestamp and process cluster data
     CURRENT_TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+    PODS_MD_FILE="${INFO_CACHE}/${CLUSTER_NAME}_pods.md"
+    INGRESS_MD_FILE="${INFO_CACHE}/${CLUSTER_NAME}_ingress.md"
 
-    # Fetch data for the cluster and directly pass to the parser
-    log "INFO" "Fetching and parsing pod and ingress data for '$CLSTRNM'"
-
-    # Define the output files
-    PODS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_pods.md"
-    INGRESS_MD_FILE="${INFO_CACHE}/${CLSTRNM}_ingress.md"
-
-    # Fetch pods and parse to Markdown
-    log "INFO" "Fetching pods data for '$CLSTRNM'"
+    # Fetch and process pod data
+    log "INFO" "Fetching pods data for '$CLUSTER_NAME'"
     if kubectl get pods -A -o json | python3 "${SCRIPT_DIR}/parser.py" --pods -dl \
-        --cluster_name "$CLSTRNM" --timestamp "$CURRENT_TIMESTAMP" --output_file "$PODS_MD_FILE"; then
-        log "INFO" "Pod data for '$CLSTRNM' successfully written to '$PODS_MD_FILE'"
+        --cluster_name "$CLUSTER_NAME" --timestamp "$CURRENT_TIMESTAMP" --output_file "$PODS_MD_FILE"; then
+        log "INFO" "Pod data successfully written to '$PODS_MD_FILE'"
     else
-        log "ERROR" "Failed to fetch or parse pods data for '$CLSTRNM'"
+        log "ERROR" "Failed to fetch or parse pods data for '$CLUSTER_NAME'"
     fi
 
-    # Fetch ingress and parse to Markdown
-    log "INFO" "Fetching ingress data for '$CLSTRNM'"
+    # Fetch and process ingress data
+    log "INFO" "Fetching ingress data for '$CLUSTER_NAME'"
     if kubectl get ingress -A -o json | python3 "${SCRIPT_DIR}/parser.py" --ingress -dl \
-        --cluster_name "$CLSTRNM" --timestamp "$CURRENT_TIMESTAMP" --output_file "$INGRESS_MD_FILE"; then
-        log "INFO" "Ingress data for '$CLSTRNM' successfully written to '$INGRESS_MD_FILE'"
+        --cluster_name "$CLUSTER_NAME" --timestamp "$CURRENT_TIMESTAMP" --output_file "$INGRESS_MD_FILE"; then
+        log "INFO" "Ingress data successfully written to '$INGRESS_MD_FILE'"
     else
-        log "ERROR" "Failed to fetch or parse ingress data for '$CLSTRNM'"
+        log "ERROR" "Failed to fetch or parse ingress data for '$CLUSTER_NAME'"
     fi
 
-done < "${NAMEID_MAP}"
+done < "${CLUSTER_MAP}"
 
 # Show contents of the info cache directory
 log "INFO" "Contents of directory '${INFO_CACHE}':"
 ls -l "${INFO_CACHE}" || { log "ERROR" "Failed to list contents of '${INFO_CACHE}'"; exit 1; }
 
-# --- Begin Git Operations Integration ---
+# Git operations
+GIT_REPO_URL="https://github.com/g8rdier/k8s_cluster_crawler.git"
+REPO_DIR="/tmp/repo"
 
-# Git token and repository configuration
-GIT_REPO_URL="https://gitlab-ci-token:${PUSH_BOM_PAGES}@git.f-i-ts.de/devops-services/alle/docs/intern.git"
-
-# Mask the Git token in the logs
-echo "oauth: '[MASKED]'"
-
-# Clone the repository into a temporary directory
-REPO_DIR="/tmp/docs-repo"
+# Clone or update repository
 if [ ! -d "${REPO_DIR}" ]; then
     log "INFO" "Cloning repository into '${REPO_DIR}'"
     git clone "${GIT_REPO_URL}" "${REPO_DIR}" || { log "ERROR" "Failed to clone repository"; exit 1; }
 else
-    log "INFO" "Repository already cloned. Pulling latest changes in '${REPO_DIR}'"
+    log "INFO" "Repository already cloned. Pulling latest changes"
     cd "${REPO_DIR}" || { log "ERROR" "Failed to navigate to '${REPO_DIR}'"; exit 1; }
     git pull origin main || { log "ERROR" "Failed to pull latest changes"; exit 1; }
     cd - || exit
 fi
 
-# Set paths within the repository
-INGRESS_PATH="${REPO_DIR}/betrieb/boms/k8s/ingress"
-PODS_PATH="${REPO_DIR}/betrieb/boms/k8s/pods"
+# Set up repository paths
+INGRESS_PATH="${REPO_DIR}/data/ingress"
+PODS_PATH="${REPO_DIR}/data/pods"
 
-# Create target directories in the repository
+# Create directories
 create_directory "${INGRESS_PATH}" || { log "ERROR" "Failed to create directory '${INGRESS_PATH}'"; exit 1; }
 create_directory "${PODS_PATH}" || { log "ERROR" "Failed to create directory '${PODS_PATH}'"; exit 1; }
 
-# Copy the new data into the repository directory
-log "INFO" "Copying ingress files to '${INGRESS_PATH}/'"
-if cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/"; then
-    log "INFO" "Ingress files copied successfully to '${INGRESS_PATH}/'"
-else
-    log "ERROR" "Error copying ingress files to '${INGRESS_PATH}/'"
-    exit 1
-fi
+# Copy files
+log "INFO" "Copying files to repository"
+cp -r "${INFO_CACHE}"/*_ingress.md "${INGRESS_PATH}/" || { log "ERROR" "Error copying ingress files"; exit 1; }
+cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/" || { log "ERROR" "Error copying pods files"; exit 1; }
 
-log "INFO" "Copying pods files to '${PODS_PATH}/'"
-if cp -r "${INFO_CACHE}"/*_pods.md "${PODS_PATH}/"; then
-    log "INFO" "Pods files copied successfully to '${PODS_PATH}/'"
-else
-    log "ERROR" "Error copying pods files to '${PODS_PATH}'"
-    exit 1
-fi
-
-# Configure Git with a generic user
+# Configure Git
 cd "${REPO_DIR}" || { log "ERROR" "Failed to navigate to '${REPO_DIR}'"; exit 1; }
-git config user.email "ci@f-i-ts.de"
+git config user.email "crawler@example.com"
 git config user.name "Cluster Crawler"
 
-# Pull the latest changes again to ensure up-to-date before committing
-git pull origin main || { log "ERROR" "Failed to pull latest changes before committing"; exit 1; }
+# Commit and push changes
+COMMIT_MESSAGE="Cluster crawling on $(date +"%Y-%m-%d") at $(date +"%H:%M")"
 
-# Stage all changes
 git add -A || { log "ERROR" "Failed to stage changes"; exit 1; }
+git commit --allow-empty -m "$COMMIT_MESSAGE" || log "WARNING" "Nothing to commit"
 
-# Construct the commit message with timestamp
-COMMIT_MESSAGE="Clustercrawling am $(date +"%d.%m.%Y") um $(date +"%H:%M") Uhr"
-
-# Commit and push changes, forcing a commit even if there are no changes
-if git commit --allow-empty -am "$COMMIT_MESSAGE"; then
-    log "INFO" "Committed changes successfully"
-else
-    log "WARNING" "Nothing to commit, but proceeding to push"
-fi
-
-# Push changes to remote
 if git push origin main; then
-    log "INFO" "Git push completed successfully"
+    log "INFO" "Successfully pushed changes to repository"
 else
-    log "ERROR" "Failed to push changes to the repository"
+    log "ERROR" "Failed to push changes to repository"
     exit 1
 fi
 
