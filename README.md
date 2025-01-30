@@ -1,122 +1,233 @@
-# Cluster-Scraper und Datenerfassungspipeline
+# Kubernetes Cluster Crawler
 
-Dieses Projekt ist ein Kubernetes-Cluster-Scraper und eine Datenerfassungspipeline, die Informationen über Kubernetes-Pods und Ingresses von mehreren Clustern sammelt. Die Daten werden gesammelt, in Markdown-Format geparst und im Repository zur späteren Analyse gespeichert.
+This project is a Kubernetes cluster crawler and data collection pipeline that gathers information about Kubernetes pods and ingresses from multiple clusters. The data is collected, formatted in Markdown, and stored in the repository for later analysis.
 
-## Funktionen
+## Features
 
-- **Scraped Kubernetes-Cluster-Daten** (Pods, Ingresses) von mehreren Clustern.
-- **Parsed die gesammelten Daten** in strukturierte Markdown-Dateien (`.md`).
-- **Automatische Ausführung einmal täglich** (um 3 Uhr) über eine CI/CD-Pipeline in GitLab.
-- **Detaillierte Protokollierung** für Transparenz während des Scraping-Prozesses.
-- **Speichert die Daten** für jeden Cluster mit zugehörigen Zeitstempeln.
-- **Unterstützt manuelles und automatisches Auslösen** der CI/CD-Pipeline bei Änderungen im `main`-Branch.
+- Scrapes Kubernetes cluster data (Pods, Ingresses) from multiple clusters
+- Parses collected data into structured Markdown format
+- Automatic daily execution at 3 AM UTC via GitHub Actions
+- Detailed logging for transparency during scraping process
+- Stores data for each cluster with corresponding timestamps
+- Supports manual and automated execution via GitHub Actions
+- Cross-platform support (Linux, macOS, Windows)
 
-## Komponenten
+## Components
 
-### 1. `crawler.sh`
-Das Hauptskript, das für die folgenden Aufgaben verantwortlich ist:
-- Abrufen von Daten von jedem Kubernetes-Cluster (Pods und Ingresses).
-- Aufruf des Python-Parsers zur Umwandlung der Rohdaten in Markdown-Format.
-- Speichern der Ausgaben in den angegebenen Verzeichnissen.
-- Automatisches Pushen der gesammelten Daten in das GitLab-Repository mit einer Commit-Nachricht, die den Zeitstempel enthält.
+### 1. crawler.sh
+The main script responsible for:
+- Retrieving data from each Kubernetes cluster (Pods and Ingresses)
+- Calling the Python parser to convert raw data to Markdown format
+- Storing output in specified directories
+- Automatically pushing collected data to GitHub repository with timestamped commits
 
-### 2. `parser.py`
-Ein Python-Skript, das:
-- Die gesammelten JSON-Daten aus den Kubernetes-Clustern verarbeitet.
-- Relevante Informationen über Pods und Ingresses extrahiert.
-- Die Daten in Markdown-Tabellen formatiert.
-- Einen Zeitstempel hinzufügt, der angibt, wann die Daten erfasst wurden.
+### 2. parser.py
+A Python script that:
+- Processes collected JSON data from Kubernetes clusters
+- Extracts relevant information about Pods and Ingresses
+- Formats data into Markdown tables
+- Includes timestamp indicating when data was collected
 
-### 3. `.gitlab-ci.yml`
-Die CI/CD-Pipeline-Konfiguration, die:
-- Automatisch das Skript `crawler.sh` jeden Tag um 3 Uhr ausführt.
-- Manuelles Auslösen unterstützt und auf Änderungen im `main`-Branch reagiert.
-- Artefakte speichert, die die vom Scraper generierten Markdown-Dateien enthalten.
+### 3. GitHub Actions Workflow
+Handles automated execution:
+- Runs daily at 3 AM UTC
+- Manages dependencies via Poetry
+- Collects and commits data automatically
 
-## Einrichtung
+## Installation
 
-### Voraussetzungen
-- **Zugriff auf mehrere Kubernetes-Cluster.**
-- **Installierte Tools:** `kubectl`, `yq`, `python3`, `pip3`.
-- **GitLab zur Automatisierung mit CI/CD.**
-- **GitLab Personal Access Token** (zum Pushen der Daten zurück ins Repository).
-- **Die `kubeconfig`-Dateien** für jeden Kubernetes-Cluster.
+### Prerequisites
 
-### Umgebungsvariablen
-Stelle sicher, dass die folgenden Umgebungsvariablen in deiner CI/CD-Pipeline (GitLab-Projekteinstellungen unter **Settings > CI/CD > Variables**) gesetzt sind:
-- `fttc_tdf01_kubeconfig`, `fttc_tds01_kubeconfig`, `fttc_tf01_kubeconfig` etc., die das Base64-kodierte `kubeconfig` für jeden Cluster enthalten.
-- `PUSH_BOM_PAGES` zur Authentifizierung und zum Pushen der generierten Markdown-Dateien zurück ins Repository.
+1. **Git**:
+   - **Windows**: Download from [git-scm.com](https://git-scm.com/download/win)
+   - **macOS**: `brew install git` or download from [git-scm.com](https://git-scm.com/download/mac)
+   - **Linux**: 
+     ```bash
+     # Debian/Ubuntu
+     sudo apt-get install git
+     # Fedora
+     sudo dnf install git
+     # Arch Linux
+     sudo pacman -S git
+     ```
 
-### Installation
+2. **Python 3.11+**:
+   - **Windows**: 
+     - Download from [Python.org](https://www.python.org/downloads/) or
+     - Use winget: `winget install Python.3.11`
+   - **macOS**: 
+     - `brew install python@3.11` or
+     - Download from [Python.org](https://www.python.org/downloads/mac)
+   - **Linux**:
+     ```bash
+     # Debian/Ubuntu
+     sudo apt-get install python3.11
+     # Fedora
+     sudo dnf install python3.11
+     # Arch Linux
+     sudo pacman -S python
+     ```
 
-1. **Repository klonen**:
-   ```bash
-   git clone https://git.f-i-ts.de/devops-services/toolchain/develop/tc-cluster-crawler.git
-   cd tc-cluster-crawler
+3. **kubectl**:
+   - **Windows**:
+     ```powershell
+     # Using chocolatey
+     choco install kubernetes-cli
+     # Or using winget
+     winget install Kubernetes.kubectl
+     ```
+   - **macOS**:
+     ```bash
+     brew install kubectl
+     ```
+   - **Linux**:
+     ```bash
+     # Debian/Ubuntu
+     sudo apt-get install kubectl
+     # Fedora
+     sudo dnf install kubectl
+     # Arch Linux
+     sudo pacman -S kubectl
+     ```
 
-2. **Abhängigkeiten installieren**:
+4. **Poetry**:
+   - **All platforms**:
+     ```bash
+     # Windows (PowerShell)
+     (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
 
-Installiere die erforderlichen Abhängigkeiten für den Python-Parser:
+     # macOS/Linux
+     curl -sSL https://install.python-poetry.org | python3 -
+     ```
+
+### Setup
+
+1. Clone the repository:
 ```bash
-pip3 install tabulate
+git clone https://github.com/g8rdier/k8s_cluster_crawler.git
+cd k8s_cluster_crawler
 ```
 
-Stelle sicher, dass `yq` verfügbar ist, entweder durch manuelle Installation oder durch automatische Installation über die CI/CD-Pipeline:
+2. Install dependencies:
 ```bash
-wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64
-chmod +x /usr/local/bin/yq
+# Windows/macOS/Linux
+poetry install --no-root
 ```
-### Verwendung
 
-1. **Manuelle Ausführung lokal**:
-Um den Scraper lokal zu testen, kannst du `crawler.sh` manuell ausführen:
+3. Configure your clusters in `scripts/docs/cluster_map.yaml`
+
+## Usage
+
+### Running Locally
+
+#### Linux/macOS
 ```bash
-./scripts/cluster_crawler.sh -dl
+./scripts/docs/cluster_crawler.sh -dl
 ```
-Dies wird Daten von den Clustern sammeln, sie mit dem Python-Skript parsen und die resultierenden Markdown-Dateien im Verzeichnis `info_cache` speichern.
 
-2. **Ausführung über Gitlab CI/CD**:
-Der Scraper ist so konfiguriert, dass er automatisch jeden Tag um 3 Uhr über GitLab CI/CD ausgeführt wird. Die `.gitlab-ci.yml`-Datei übernimmt:
+#### Windows (PowerShell)
+```powershell
+# First time only: Make script executable
+chmod +x ./scripts/docs/cluster_crawler.sh
 
-- Installation von Abhängigkeiten.
-- Ausführung des Scrapers.
-- Push der Ergebnisse ins Repository.
-
-Die Pipeline kann auch manuell ausgelöst werden, indem Änderungen an den `main`-Branch gepusht werden oder die Pipeline direkt über GitLab ausgeführt wird.
-
-### Ausgaben
-
-Die Ausgabe des Scrapers besteht aus Markdown-Dateien (`.md`) für jeden Cluster. Die Dateien sind wie folgt strukturiert:
-
-- Pod-Informationen:
-   - Namespace
-   - Pod-Name
-   - Image
-   - Node-Name
-   - Kubernetes-Version
-   - Ingress-Informationen:
-
-- Namespace
-   - Name
-   - Hosts
-   - Adresse
-   - Ports
-
-Jede Datei enthält einen Zeitstempel, der angibt, wann die Daten gesammelt wurden:
-
+# Run the crawler
+bash ./scripts/docs/cluster_crawler.sh -dl
 ```
-Erstellt am 28.10.2024, 03:00
+
+### Development & Testing
+
+#### Local GitHub Actions Testing
+
+1. Install `act`:
+   - **Windows**: 
+     ```powershell
+     choco install act-cli
+     # Or
+     scoop install act
+     ```
+   - **macOS**: 
+     ```bash
+     brew install act
+     ```
+   - **Linux**:
+     ```bash
+     # Using curl
+     curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+     # Or using snap
+     sudo snap install act
+     ```
+
+2. Start Docker:
+   - **Windows/macOS**: Start Docker Desktop
+   - **Linux**: `sudo systemctl start docker`
+
+3. Run the workflow:
+```bash
+# For amd64 systems (most computers)
+act -j collect_data --container-architecture linux/amd64
+
+# For arm64 systems (M1/M2 Macs, some Linux)
+act -j collect_data --container-architecture linux/arm64
 ```
-### Artefakte
-Die generierten Markdown-Dateien werden als Artefakte in der GitLab-Pipeline gespeichert. Sie sind eine Woche lang verfügbar und können heruntergeladen werden.
 
-### CI/CD-Konfiguration
-Die `.gitlab-ci.yml`-Datei stellt sicher, dass die Pipeline unter folgenden Bedingungen ausgeführt wird:
+## Configuration
 
-Bei Änderungen im `main`-Branch und bei geplanten Ausführungen.
-Ein wöchentlicher Lauf erfolgt jeden Montag um 7 Uhr.
-Die Pipeline kann manuell oder bei Änderungen im `main`-Branch ausgelöst werden.
-Die Job-Ergebnisse werden als Commit mit Zeitstempel in das Repository gepusht.
+The `scripts/docs/cluster_map.yaml` contains cluster configurations:
+```yaml
+clusters:
+  prod-cluster-1:
+    uuid: cluster-prod-1-uuid
+  stage-cluster-1:
+    uuid: cluster-stage-1-uuid
+  # ... add your clusters here
+```
+
+## Troubleshooting
+
+### Windows
+- If you get line ending errors:
+  ```powershell
+  git config --global core.autocrlf false
+  ```
+- If PowerShell blocks script execution:
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+  ```
+
+### Linux
+- If you get permission denied for Docker:
+  ```bash
+  sudo usermod -aG docker $USER
+  newgrp docker
+  ```
+
+### macOS
+- If you get "command not found" errors:
+  ```bash
+  export PATH="$HOME/.local/bin:$PATH"  # For Poetry
+  ```
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Development Setup
+
+### IDE Configuration
+
+This project includes VS Code settings for optimal Python development. When using VS Code:
+
+1. Install the Python extension
+2. Open the project
+3. VS Code should automatically:
+   - Detect the Poetry virtual environment
+   - Enable proper import resolution
+   - Configure Python path settings
+
+For other IDEs, ensure they are configured to use the Poetry virtual environment at:
+```bash
+$(poetry env info --path)
+```
 
 
 

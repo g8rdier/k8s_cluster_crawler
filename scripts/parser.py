@@ -1,148 +1,140 @@
 #!/usr/bin/env python3
+
 import json
 import os
-import argparse
-import logging
 import sys
-from tabulate import tabulate
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Dict, List
 
-def configure_logging(detailed):
-    """
-    Configures the logging level based on user selection.
-    """
-    if detailed:
-        logging.basicConfig(level=logging.INFO)
-    else:
-        logging.basicConfig(level=logging.WARNING)
+try:
+    from tabulate import tabulate
+except ImportError:
+    print("Error: tabulate package not found. Please install it using: poetry install")
+    sys.exit(1)
 
-def extract_ingress_info(json_data):
-    """
-    Extracts relevant Ingress information from the given JSON data.
-    """
-    ingress_info = []
-    for item in json_data.get('items', []):
-        metadata = item.get('metadata', {})
-        spec = item.get('spec', {})
-        status = item.get('status', {})
 
-        namespace = metadata.get('namespace', 'N/A')
-        name = metadata.get('name', 'N/A')
-
-        logging.info(f"Extracting data for Namespace: {namespace}, Name: {name}")
-
-        hosts = ", ".join(rule.get('host', 'N/A') for rule in spec.get('rules', []))
-        if not hosts:
-            logging.warning(f"Warning: Missing Hosts for Ingress '{name}' in Namespace '{namespace}'.")
-
-        address = ", ".join(lb.get('ip', 'N/A') for lb in status.get('loadBalancer', {}).get('ingress', []))
-        if not address:
-            logging.warning(f"Warning: Missing IP Address for Ingress '{name}' in Namespace '{namespace}'.")
-
-        ports = set()
-        if 'tls' in spec:
-            ports.add("443")
-        for rule in spec.get('rules', []):
-            http_paths = rule.get('http', {}).get('paths', [])
-            for path in http_paths:
-                backend = path.get('backend', {})
-                service = backend.get('service', {})
-                port = service.get('port', {}).get('number', '80')
-                ports.add(str(port))
-
-        ports_str = ", ".join(ports) if ports else "80"
-
-        ingress_info.append([namespace, name, hosts, address, ports_str])
-    return ingress_info
-
-def extract_pod_info(json_data):
-    """
-    Extracts relevant Pod information from the given JSON data.
-    """
-    pod_info = []
-    for item in json_data.get('items', []):
-        metadata = item.get('metadata', {})
-        spec = item.get('spec', {})
-        status = item.get('status', {})
-
-        namespace = metadata.get('namespace', 'N/A')
-        name = metadata.get('name', 'N/A')
-        node_name = spec.get('nodeName', 'N/A')
-        containers = spec.get('containers', [])
-        images = ", ".join(container.get('image', 'N/A') for container in containers)
-        kubernetes_version = status.get('kubernetesVersion', 'N/A')
-
-        logging.info(f"Extracting Pod data for Namespace: {namespace}, Name: {name}, Node: {node_name}, Image(s): {images}")
-
-        pod_info.append([namespace, name, images, node_name, kubernetes_version])
-    return pod_info
-
-def generate_markdown_table(data, headers, output_file, title, timestamp):
-    """
-    Generates a Markdown file with a table displaying the extracted information.
-
-    :param data: List of extracted information
-    :param headers: Table headers
-    :param output_file: Path to the output Markdown file
-    :param title: Title for the Markdown content
-    :param timestamp: Timestamp of data collection
-    """
+def generate_markdown_table(headers: List[str], data: List[List[str]]) -> str:
+    """Generate a markdown table manually if tabulate fails."""
     if not data:
-        logging.warning(f"No data to generate the Markdown file for {title}.")
-        return
+        return "No data available\n"
+    
+    # Create header
+    table = "| " + " | ".join(headers) + " |\n"
+    # Add separator
+    table += "| " + " | ".join(["---" for _ in headers]) + " |\n"
+    # Add data
+    for row in data:
+        table += "| " + " | ".join(str(cell) for cell in row) + " |\n"
+    
+    return table
 
-    table = tabulate(data, headers, tablefmt="pipe")
-    # Format the timestamp
-    timestamp_formatted = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y, %H:%M")
-    markdown_content = f"# {title}\n\nErstellt am {timestamp_formatted}\n\n{table}\n"
 
-    with open(output_file, 'w', encoding='utf-8') as file:
-        file.write(markdown_content)
+def load_json_file(file_path: str) -> Dict:
+    """Load and parse a JSON file."""
+    try:
+        with open(file_path, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading JSON file {file_path}: {e}")
+        return {}
 
-    logging.info(f"Markdown file created at {output_file}.")
+
+def format_timestamp() -> str:
+    """Get current timestamp in Berlin timezone."""
+    return datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+def parse_pods(pods_data: Dict) -> List[List[str]]:
+    """Parse pods data into a table format."""
+    table_data = []
+    if not pods_data.get("items"):
+        return table_data
+
+    for pod in pods_data["items"]:
+        metadata = pod.get("metadata", {})
+        status = pod.get("status", {})
+        
+        name = metadata.get("name", "N/A")
+        namespace = metadata.get("namespace", "N/A")
+        phase = status.get("phase", "N/A")
+        pod_ip = status.get("podIP", "N/A")
+        
+        table_data.append([name, namespace, phase, pod_ip])
+    
+    return table_data
+
+
+def parse_ingresses(ingress_data: Dict) -> List[List[str]]:
+    """Parse ingress data into a table format."""
+    table_data = []
+    if not ingress_data.get("items"):
+        return table_data
+
+    for ingress in ingress_data["items"]:
+        metadata = ingress.get("metadata", {})
+        spec = ingress.get("status", {}).get("loadBalancer", {}).get("ingress", [{}])[0]
+        
+        name = metadata.get("name", "N/A")
+        namespace = metadata.get("namespace", "N/A")
+        hostname = spec.get("hostname", "N/A")
+        ip = spec.get("ip", "N/A")
+        
+        table_data.append([name, namespace, hostname, ip])
+    
+    return table_data
+
+
+def create_markdown_table(headers: List[str], data: List[List[str]]) -> str:
+    """Create a markdown table with headers and data."""
+    try:
+        return tabulate(data, headers=headers, tablefmt="pipe")
+    except Exception:
+        return generate_markdown_table(headers, data)
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Parses Kubernetes JSON data and generates Markdown output.")
-    parser.add_argument('--pods', action='store_true', help="Process pod data.")
-    parser.add_argument('--ingress', action='store_true', help="Process ingress data.")
-    parser.add_argument('-dl', action='store_true', help="Enable detailed logging.")
-    parser.add_argument('--output_file', required=True, help="Path to the output Markdown file.")
-    parser.add_argument('--cluster_name', required=False, help="Name of the cluster.")
-    parser.add_argument('--timestamp', required=False, help="Timestamp of data collection.")
-    args = parser.parse_args()
+    if len(sys.argv) != 4:
+        print("Usage: parser.py <pods_json> <ingress_json> <output_md>")
+        sys.exit(1)
 
-    configure_logging(args.dl)
+    pods_file = sys.argv[1]
+    ingress_file = sys.argv[2]
+    output_file = sys.argv[3]
 
-    # Read JSON input from stdin
+    # Load JSON data
+    pods_data = load_json_file(pods_file)
+    ingress_data = load_json_file(ingress_file)
+
+    # Parse data
+    pods_table = parse_pods(pods_data)
+    ingress_table = parse_ingresses(ingress_data)
+
+    # Create markdown content
+    content = f"# Cluster Status Report\n\n"
+    content += f"Generated: {format_timestamp()}\n\n"
+    
+    content += "## Pods\n\n"
+    content += create_markdown_table(
+        ["Name", "Namespace", "Status", "IP"],
+        pods_table
+    )
+    content += "\n\n"
+    
+    content += "## Ingresses\n\n"
+    content += create_markdown_table(
+        ["Name", "Namespace", "Hostname", "IP"],
+        ingress_table
+    )
+
+    # Write to file
     try:
-        json_data = json.load(sys.stdin)
-    except json.JSONDecodeError as e:
-        logging.error(f"Failed to parse JSON input: {e}")
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        with open(output_file, "w") as f:
+            f.write(content)
+    except Exception as e:
+        print(f"Error writing markdown file: {e}")
         sys.exit(1)
 
-    if args.pods:
-        pod_info = extract_pod_info(json_data)
-        title = args.cluster_name if args.cluster_name else "Cluster Information"
-        generate_markdown_table(
-            pod_info,
-            ["Namespace", "Pod Name", "Image", "Node Name", "Kubernetes Version"],
-            output_file=args.output_file,
-            title=title,
-            timestamp=args.timestamp
-        )
-    elif args.ingress:
-        ingress_info = extract_ingress_info(json_data)
-        title = args.cluster_name if args.cluster_name else "Cluster Information"
-        generate_markdown_table(
-            ingress_info,
-            ["Namespace", "Name", "Hosts", "Address", "Ports"],
-            output_file=args.output_file,
-            title=title,
-            timestamp=args.timestamp
-        )
-    else:
-        logging.error("No data type specified. Use --pods or --ingress.")
-        sys.exit(1)
 
 if __name__ == "__main__":
     main()

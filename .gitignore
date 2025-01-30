@@ -1,12 +1,49 @@
 # Ignore only the JSON files and temporary files inside scripts/info_cache_*
-scripts/info_cache_*/**/*.json
+scripts/info_cache_*/*/*.json
 
 # Do not ignore Markdown files
-!scripts/info_cache_*/**/*.md
+!scripts/info_cache_*/*/*.md
 
 # Ignore results directory, but not the Markdown files
-scripts/results/**/*.json
-!scripts/results/**/*.md
+scripts/results/*/*.json
+scripts/results/*/*.md
 
-# Ignore tmps directory entirely
-scripts/tmps
+# Ignore tmp directory entirely
+scripts/tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.env
+.venv
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json  # Keep this file for consistent development experience
+*.swp
+*.swo
+
+# Poetry
+poetry.lock
