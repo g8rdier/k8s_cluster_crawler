@@ -96,7 +96,7 @@ log "INFO" "FORCE_REBUILD is set to 1, updating all cached cluster information"
 rm -rf "${INFO_CACHE:?}"/* > /dev/null 2>&1 || true
 
 # NAMEID Scraper: Retrieve and save name-ID mapping for all clusters
-NAMEID_MAP="${SCRIPT_DIR}/docs/name_id.map"
+NAMEID_MAP="${SCRIPT_DIR}/docs/cluster_map.yaml"
 
 if [ -f "${NAMEID_MAP}" ]; then
     log "INFO" "Static name_id.map file found. Using the file for cluster information."
