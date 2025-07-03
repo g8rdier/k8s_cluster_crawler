@@ -6,8 +6,7 @@ export TZ="Europe/Berlin"
 
 # Set script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLUSTER_MAP="$SCRIPT_DIR/docs/cluster_map.yaml"  # This was pointing to the old file
-
+CLUSTER_MAP="$SCRIPT_DIR/docs/cluster_map.yaml" 
 # Logging function with timestamps
 log() {
     local level="$1"
